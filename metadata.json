@@ -1,0 +1,6 @@
+{
+  "name": "Shelfmates",
+  "description": "Mobile book club and ARC management platform for indie authors and reader communities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
