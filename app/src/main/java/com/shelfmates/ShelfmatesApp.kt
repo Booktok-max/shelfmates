@@ -15,16 +15,19 @@ class ShelfmatesApp : Application() {
     private fun initializeFirebaseSafely() {
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
-                // Initialize default FirebaseApp using context resources or fallback options
                 val app = FirebaseApp.initializeApp(this)
                 if (app == null) {
-                    val fallbackOptions = FirebaseOptions.Builder()
-                        .setApplicationId("com.aistudio.shelfmates.readery")
-                        .setProjectId("shelfmates-indie-book-club")
-                        .setApiKey("AIzaSyShelfmatesFallbackClientKey1234567")
-                        .build()
-                    FirebaseApp.initializeApp(this, fallbackOptions)
-                    Log.i("ShelfmatesApp", "FirebaseApp initialized with fallback options")
+                    if (BuildConfig.DEBUG) {
+                        val fallbackOptions = FirebaseOptions.Builder()
+                            .setApplicationId("com.aistudio.shelfmates.readery")
+                            .setProjectId("shelfmates-indie-book-club")
+                            .setApiKey("AIzaSyShelfmatesFallbackClientKey1234567")
+                            .build()
+                        FirebaseApp.initializeApp(this, fallbackOptions)
+                        Log.i("ShelfmatesApp", "FirebaseApp initialized with debug demo fallback options")
+                    } else {
+                        throw IllegalStateException("Firebase configuration (google-services.json) is missing in production build.")
+                    }
                 } else {
                     Log.i("ShelfmatesApp", "FirebaseApp initialized successfully with google-services config")
                 }
@@ -32,16 +35,21 @@ class ShelfmatesApp : Application() {
                 Log.i("ShelfmatesApp", "FirebaseApp already initialized")
             }
         } catch (e: Exception) {
-            Log.w("ShelfmatesApp", "Gracefully handling Firebase initialization: ${e.message}")
-            try {
-                val fallbackOptions = FirebaseOptions.Builder()
-                    .setApplicationId("com.aistudio.shelfmates.readery")
-                    .setProjectId("shelfmates-indie-book-club")
-                    .setApiKey("AIzaSyShelfmatesFallbackClientKey1234567")
-                    .build()
-                FirebaseApp.initializeApp(this, fallbackOptions)
-            } catch (fallbackError: Exception) {
-                Log.w("ShelfmatesApp", "Fallback Firebase initialization bypassed; using local offline persistence: ${fallbackError.message}")
+            if (BuildConfig.DEBUG) {
+                Log.w("ShelfmatesApp", "Gracefully handling Firebase initialization in debug: ${e.message}")
+                try {
+                    val fallbackOptions = FirebaseOptions.Builder()
+                        .setApplicationId("com.aistudio.shelfmates.readery")
+                        .setProjectId("shelfmates-indie-book-club")
+                        .setApiKey("AIzaSyShelfmatesFallbackClientKey1234567")
+                        .build()
+                    FirebaseApp.initializeApp(this, fallbackOptions)
+                } catch (fallbackError: Exception) {
+                    Log.w("ShelfmatesApp", "Fallback Firebase initialization bypassed: ${fallbackError.message}")
+                }
+            } else {
+                Log.e("ShelfmatesApp", "FATAL: Firebase initialization failed in production: ${e.message}")
+                throw e
             }
         }
     }

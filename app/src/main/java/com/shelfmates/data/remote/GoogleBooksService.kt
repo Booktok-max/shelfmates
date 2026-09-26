@@ -99,13 +99,17 @@ class GoogleBooksService {
             Log.d(TAG, "Google Books: ${items.size} results for '$query'")
             Result.success(items)
         } catch (e: Exception) {
-            Log.w(TAG, "Google Books search failed: ${e.message}. Trying curated fallback.")
-            val fallback = getCuratedFallbackBooks().filter { book ->
-                book.displayTitle.contains(query, ignoreCase = true) ||
-                        book.displayAuthors.contains(query, ignoreCase = true) ||
-                        book.displayCategory.contains(query, ignoreCase = true)
+            Log.w(TAG, "Google Books search failed: ${e.message}.")
+            if (BuildConfig.DEBUG) {
+                val fallback = getCuratedFallbackBooks().filter { book ->
+                    book.displayTitle.contains(query, ignoreCase = true) ||
+                            book.displayAuthors.contains(query, ignoreCase = true) ||
+                            book.displayCategory.contains(query, ignoreCase = true)
+                }
+                if (fallback.isNotEmpty()) Result.success(fallback) else Result.failure(e)
+            } else {
+                Result.failure(e)
             }
-            if (fallback.isNotEmpty()) Result.success(fallback) else Result.failure(e)
         }
     }
 
@@ -134,9 +138,13 @@ class GoogleBooksService {
             Result.success(api.getVolumeById(volumeId))
         } catch (e: Exception) {
             Log.e(TAG, "getVolumeById failed for $volumeId: ${e.message}")
-            getCuratedFallbackBooks().find { it.id == volumeId }
-                ?.let { Result.success(it) }
-                ?: Result.failure(e)
+            if (BuildConfig.DEBUG) {
+                getCuratedFallbackBooks().find { it.id == volumeId }
+                    ?.let { Result.success(it) }
+                    ?: Result.failure(e)
+            } else {
+                Result.failure(e)
+            }
         }
     }
 

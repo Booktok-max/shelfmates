@@ -199,17 +199,22 @@ object SupabaseStorageService {
             Log.w(TAG, "Direct Supabase network fetch for $targetUrl returned: ${e.message}. Using built-in ARC compiler.")
         }
 
-        // 4. If remote is unreachable or empty, generate a pristine local EPUB or PDF ARC document
+        // 4. If remote is unreachable or empty, handle according to demo vs production mode
         if (!downloadedSuccessfully) {
-            emit(SupabaseDownloadState.Downloading(45, 450_000, 1_000_000))
-            withContext(Dispatchers.IO) {
-                if (cleanFormat == "pdf") {
-                    generateSamplePdfArc(localTargetFile, title, author, bookId)
-                } else {
-                    generateSampleEpubArc(localTargetFile, title, author, bookId)
+            if (BuildConfig.DEBUG) {
+                emit(SupabaseDownloadState.Downloading(45, 450_000, 1_000_000))
+                withContext(Dispatchers.IO) {
+                    if (cleanFormat == "pdf") {
+                        generateSamplePdfArc(localTargetFile, title, author, bookId)
+                    } else {
+                        generateSampleEpubArc(localTargetFile, title, author, bookId)
+                    }
                 }
+                emit(SupabaseDownloadState.Downloading(90, 900_000, 1_000_000))
+            } else {
+                emit(SupabaseDownloadState.Error("Failed to stream ARC from Supabase Storage in production mode. Network error or missing file.", null))
+                return@flow
             }
-            emit(SupabaseDownloadState.Downloading(90, 900_000, 1_000_000))
         }
 
         val sizeMb = String.format("%.2f", localTargetFile.length() / (1024.0 * 1024.0)).toDoubleOrNull() ?: 1.5
