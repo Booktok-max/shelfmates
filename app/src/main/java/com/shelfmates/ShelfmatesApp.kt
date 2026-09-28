@@ -3,54 +3,53 @@ package com.shelfmates
 import android.app.Application
 import android.util.Log
 import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
 
 class ShelfmatesApp : Application() {
+
+    private companion object {
+        const val TAG = "ShelfmatesApp"
+    }
 
     override fun onCreate() {
         super.onCreate()
         initializeFirebaseSafely()
     }
 
+    /**
+     * Initializes Firebase from the real `google-services.json`, which the
+     * google-services Gradle plugin turns into generated resources.
+     *
+     * Production boundary: this method NEVER fabricates a Firebase configuration.
+     * If the project is not configured, the app fails closed:
+     *  - release builds throw, so a misconfigured build can never ship;
+     *  - debug builds log an actionable error and continue WITHOUT Firebase, so
+     *    [com.shelfmates.data.remote.FirebaseService] reports "not configured"
+     *    instead of appearing to be signed in against an invented project.
+     */
     private fun initializeFirebaseSafely() {
-        try {
-            if (FirebaseApp.getApps(this).isEmpty()) {
-                val app = FirebaseApp.initializeApp(this)
-                if (app == null) {
-                    if (BuildConfig.DEBUG) {
-                        val fallbackOptions = FirebaseOptions.Builder()
-                            .setApplicationId("com.aistudio.shelfmates.readery")
-                            .setProjectId("shelfmates-indie-book-club")
-                            .setApiKey("AIzaSyShelfmatesFallbackClientKey1234567")
-                            .build()
-                        FirebaseApp.initializeApp(this, fallbackOptions)
-                        Log.i("ShelfmatesApp", "FirebaseApp initialized with debug demo fallback options")
-                    } else {
-                        throw IllegalStateException("Firebase configuration (google-services.json) is missing in production build.")
-                    }
-                } else {
-                    Log.i("ShelfmatesApp", "FirebaseApp initialized successfully with google-services config")
-                }
-            } else {
-                Log.i("ShelfmatesApp", "FirebaseApp already initialized")
-            }
-        } catch (e: Exception) {
-            if (BuildConfig.DEBUG) {
-                Log.w("ShelfmatesApp", "Gracefully handling Firebase initialization in debug: ${e.message}")
-                try {
-                    val fallbackOptions = FirebaseOptions.Builder()
-                        .setApplicationId("com.aistudio.shelfmates.readery")
-                        .setProjectId("shelfmates-indie-book-club")
-                        .setApiKey("AIzaSyShelfmatesFallbackClientKey1234567")
-                        .build()
-                    FirebaseApp.initializeApp(this, fallbackOptions)
-                } catch (fallbackError: Exception) {
-                    Log.w("ShelfmatesApp", "Fallback Firebase initialization bypassed: ${fallbackError.message}")
-                }
-            } else {
-                Log.e("ShelfmatesApp", "FATAL: Firebase initialization failed in production: ${e.message}")
-                throw e
-            }
+        if (FirebaseApp.getApps(this).isNotEmpty()) {
+            Log.i(TAG, "FirebaseApp already initialized")
+            return
+        }
+
+        val app = try {
+            FirebaseApp.initializeApp(this)
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Failed to initialize FirebaseApp: ${e.message}")
+            null
+        }
+
+        if (app != null) {
+            Log.i(TAG, "FirebaseApp initialized successfully with google-services config")
+            return
+        }
+
+        val message = "Firebase is not configured. Add app/google-services.json for this applicationId " +
+            "to enable Firebase Auth and Cloud Firestore."
+        if (BuildConfig.DEBUG) {
+            Log.e(TAG, "$message Running without Firebase: authentication and cloud sync are disabled.")
+        } else {
+            throw IllegalStateException(message)
         }
     }
 }

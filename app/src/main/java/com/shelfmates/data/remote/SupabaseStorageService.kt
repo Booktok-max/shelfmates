@@ -51,9 +51,23 @@ data class SupabaseArcFile(
 object SupabaseStorageService {
 
     private const val TAG = "SupabaseStorage"
-    var supabaseUrl: String = "https://rwyuqplqfexjhoxmswvc.supabase.co"
-    var supabaseAnonKey: String = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3eXVxcGxxZmV4amhveG1zd3ZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMDAwMDAsImV4cCI6MjA1NTU3NjAwMH0.sample"
-    var defaultBucket: String = "arc-manuscripts"
+
+    /**
+     * Production Supabase Storage configuration.
+     *
+     * These values are injected at build time from `SUPABASE_URL`,
+     * `SUPABASE_ANON_KEY` and `SUPABASE_BUCKET` (environment variable or Gradle
+     * property; see `.env.example`). They default to empty, and empty means
+     * "not configured" — no project URL or anon key is ever fabricated here.
+     * Declared `val` so configuration cannot be swapped at runtime.
+     */
+    val supabaseUrl: String = BuildConfig.SUPABASE_URL.trim()
+    val supabaseAnonKey: String = BuildConfig.SUPABASE_ANON_KEY.trim()
+    val defaultBucket: String = BuildConfig.SUPABASE_BUCKET.trim().ifEmpty { "arc-manuscripts" }
+
+    /** True only when a real Supabase project URL and anon key were supplied. */
+    val isConfigured: Boolean
+        get() = supabaseUrl.isNotEmpty() && supabaseAnonKey.isNotEmpty()
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -156,16 +170,30 @@ object SupabaseStorageService {
         val targetUrl = remoteUrl?.takeIf { it.isNotBlank() }
             ?: "$supabaseUrl/storage/v1/object/public/$defaultBucket/${bookId.lowercase()}.$cleanFormat"
 
+        // Production boundary: never attempt an authenticated request without a
+        // real anon key. In release an unconfigured project is a hard error.
+        if (!isConfigured) {
+            val configMessage = "Supabase Storage is not configured. Set SUPABASE_URL and " +
+                "SUPABASE_ANON_KEY at build time (see .env.example) to enable ARC downloads."
+            if (!BuildConfig.DEBUG) {
+                emit(SupabaseDownloadState.Error(configMessage, null))
+                return@flow
+            }
+            Log.w(TAG, "$configMessage This is a debug build; falling back to a locally generated sample ARC.")
+        }
+
         var downloadedSuccessfully = false
 
         // 3. Attempt download via OkHttp if network is available
         try {
             emit(SupabaseDownloadState.Downloading(15, 150_000, 1_000_000))
-            val request = Request.Builder()
-                .url(targetUrl)
-                .addHeader("apikey", supabaseAnonKey)
-                .addHeader("Authorization", "Bearer $supabaseAnonKey")
-                .build()
+            val requestBuilder = Request.Builder().url(targetUrl)
+            if (supabaseAnonKey.isNotEmpty()) {
+                requestBuilder
+                    .addHeader("apikey", supabaseAnonKey)
+                    .addHeader("Authorization", "Bearer $supabaseAnonKey")
+            }
+            val request = requestBuilder.build()
 
             val response = withContext(Dispatchers.IO) { httpClient.newCall(request).execute() }
             if (response.isSuccessful) {

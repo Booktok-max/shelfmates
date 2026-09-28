@@ -35,6 +35,34 @@ android {
       .orElse(providers.gradleProperty("NYT_BOOKS_KEY"))
       .getOrElse("")
     buildConfigField("String", "NYT_BOOKS_KEY", "\"$nytBooksApiKey\"")
+
+    // ── Production service configuration ────────────────────────────────────
+    // Supabase Storage. These default to EMPTY on purpose: an empty value means
+    // "not configured" and is handled explicitly at runtime. No credential is
+    // ever fabricated or hard-coded as a fallback. Supply them via environment
+    // variable or Gradle property (see .env.example).
+    val supabaseUrl = providers.environmentVariable("SUPABASE_URL")
+      .orElse(providers.gradleProperty("SUPABASE_URL"))
+      .getOrElse("")
+    buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+    val supabaseAnonKey = providers.environmentVariable("SUPABASE_ANON_KEY")
+      .orElse(providers.gradleProperty("SUPABASE_ANON_KEY"))
+      .getOrElse("")
+    buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+    val supabaseBucket = providers.environmentVariable("SUPABASE_BUCKET")
+      .orElse(providers.gradleProperty("SUPABASE_BUCKET"))
+      .getOrElse("")
+    buildConfigField("String", "SUPABASE_BUCKET", "\"$supabaseBucket\"")
+
+    // OAuth 2.0 *web* client ID (not the Android client ID) used as the
+    // server_client_id for Google Identity Services. Required for Google
+    // Sign-In; defaults to empty so a missing value fails closed and reports a
+    // configuration error instead of silently downgrading the session.
+    val googleWebClientId = providers.environmentVariable("GOOGLE_WEB_CLIENT_ID")
+      .orElse(providers.gradleProperty("GOOGLE_WEB_CLIENT_ID"))
+      .getOrElse("")
+    buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 

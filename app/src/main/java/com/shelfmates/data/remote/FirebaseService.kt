@@ -2,6 +2,7 @@ package com.shelfmates.data.remote
 
 import android.content.Context
 import android.util.Log
+import com.shelfmates.BuildConfig
 import com.shelfmates.data.local.BookLogEntity
 import com.shelfmates.data.local.CustomShelfEntity
 import com.shelfmates.data.local.ReadingProgressEntity
@@ -38,8 +39,8 @@ data class AuthUserState(
     val displayName: String? = null,
     val photoUrl: String? = null,
     val isAnonymous: Boolean = false,
-    val isFirestoreConnected: Boolean = true,
-    val syncStatusMessage: String = "Connected to Firebase"
+    val isFirestoreConnected: Boolean = false,
+    val syncStatusMessage: String = "Firebase not configured"
 )
 
 /**
@@ -121,20 +122,42 @@ class FirebaseService private constructor() {
 
     /**
      * Sign in with Google using Android Credential Manager and Firebase Auth.
+     *
+     * Production boundary: this method fails closed. It never silently downgrades
+     * a cancelled, mismatched or misconfigured Google sign-in into an anonymous
+     * session, because that would let an unauthenticated caller look signed in.
+     * The [serverClientId] defaults to the build-time `GOOGLE_WEB_CLIENT_ID`
+     * (the OAuth 2.0 *web* client ID); if it is absent the call returns a
+     * configuration failure instead of building a broken credential request.
      */
-    suspend fun signInWithGoogle(context: Context, serverClientId: String = ""): Result<FirebaseUser?> = withContext(Dispatchers.IO) {
+    suspend fun signInWithGoogle(
+        context: Context,
+        serverClientId: String = BuildConfig.GOOGLE_WEB_CLIENT_ID
+    ): Result<FirebaseUser?> = withContext(Dispatchers.IO) {
+        val firebaseAuth = auth
+            ?: return@withContext Result.failure(
+                IllegalStateException(
+                    "Firebase Authentication is unavailable. Add app/google-services.json and rebuild."
+                )
+            )
+
+        val effectiveServerClientId = serverClientId.trim()
+        if (effectiveServerClientId.isEmpty()) {
+            return@withContext Result.failure(
+                IllegalStateException(
+                    "Google Sign-In is not configured. Set GOOGLE_WEB_CLIENT_ID at build time " +
+                        "(see .env.example) to the OAuth 2.0 web client ID."
+                )
+            )
+        }
+
         try {
             val credentialManager = CredentialManager.create(context)
-            
-            // Build Google ID Option if client ID is provided or default
+
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
                 .setAutoSelectEnabled(false)
-                .apply {
-                    if (serverClientId.isNotBlank()) {
-                        setServerClientId(serverClientId)
-                    }
-                }
+                .setServerClientId(effectiveServerClientId)
                 .build()
 
             val request = GetCredentialRequest.Builder()
@@ -144,26 +167,37 @@ class FirebaseService private constructor() {
             val result = credentialManager.getCredential(context = context, request = request)
             val credential = result.credential
 
-            if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
-                val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                val authResult = auth?.signInWithCredential(authCredential)?.await()
-                val user = authResult?.user
-                
-                // Sync user profile to Firestore
-                user?.let { syncUserProfileToFirestore(it) }
-                
-                Result.success(user)
-            } else {
-                // Fallback to anonymous sign-in if credentials did not match
-                val anonResult = auth?.signInAnonymously()?.await()
-                Result.success(anonResult?.user)
+            if (credential !is CustomCredential ||
+                credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+            ) {
+                return@withContext Result.failure(
+                    IllegalStateException(
+                        "Google Sign-In returned an unexpected credential type. " +
+                            "Check that the SHA-1 of the signing certificate is registered for this appId."
+                    )
+                )
             }
+
+            val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
+            val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
+            val user = firebaseAuth.signInWithCredential(authCredential).await().user
+
+            if (user == null) {
+                return@withContext Result.failure(
+                    IllegalStateException("Google Sign-In completed without returning a user.")
+                )
+            }
+
+            // Sync user profile to Firestore
+            syncUserProfileToFirestore(user)
+
+            Result.success(user)
         } catch (e: GetCredentialException) {
-            Log.w(TAG, "Credential Manager Google Sign-In cancelled or failed: ${e.message}. Falling back to demo session.")
-            // Graceful fallback for local development/emulator testing
-            val anonResult = auth?.signInAnonymously()?.await()
-            Result.success(anonResult?.user)
+            // Includes user cancellation. Surface it instead of granting a session.
+            Log.w(TAG, "Google Sign-In was not completed: ${e.message}")
+            Result.failure(
+                IllegalStateException("Google Sign-In was not completed.", e)
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Error in Google Sign-In: ${e.message}", e)
             Result.failure(e)
