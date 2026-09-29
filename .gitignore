@@ -41,3 +41,11 @@ debug.keystore
 .externalNativeBuild
 .cxx
 .env
+
+# Firebase
+# google-services.json contains project identifiers and API keys for the
+# Firebase project. It is supplied per-developer/CI machine and must never be
+# committed. The app fails closed (release) when it is absent, which is the
+# intended behaviour for a repository that builds without Firebase secrets.
+app/google-services.json
+google-services.json
