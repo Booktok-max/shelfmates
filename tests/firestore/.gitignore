@@ -1,0 +1,11 @@
+# Emulator test dependencies
+node_modules/
+
+# package-lock.json IS committed: CI installs must be reproducible.
+
+# Staged copy of ../../firestore.rules, written by stage-rules.js before each run
+firestore.rules
+
+# Emulator logs
+firestore-debug.log
+ui-debug.log

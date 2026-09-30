@@ -1,0 +1,104 @@
+rules_version = '2';
+
+// Shelfmates — Cloud Firestore security rules.
+//
+// Scope note: every Firestore access in the app is user-scoped. Verified
+// against app/src/main/java/com/shelfmates/data/remote/FirebaseService.kt,
+// which touches exactly these paths:
+//
+//   users/{uid}                              read, create, update (merge)
+//   users/{uid}/reading_progress/{bookId}    write, read (snapshot listener)
+//   users/{uid}/book_logs/{logId}            write
+//   users/{uid}/bookshelf/{bookId}           write, read, delete, query
+//   users/{uid}/custom_shelves/{shelfId}     write, read, delete, query
+//
+// There are no top-level collections. Any path not matched below is denied.
+//
+// Deployment: the console may currently hold rules that were never committed
+// here. Replace them with this file (`firebase deploy --only firestore:rules`)
+// and re-run the emulator tests in tests/firestore/ before shipping.
+//
+// ── Roles ────────────────────────────────────────────────────────────────────
+// `role` is a privilege claim, so it is the one field the client may not set
+// freely. The client role picker offers READER / AUTHOR / BOOK_CLUB_MEMBER
+// only; ADMIN is deliberately absent from it and is granted out of band by
+// writing the document server-side (Firebase console or Admin SDK).
+//
+// A user may write their role exactly once, and only to a non-privileged
+// value. Afterwards it is immutable: `resource.data.role` must equal the
+// incoming value, so a compromised client cannot escalate a live account.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Roles a user is permitted to assign to themselves at sign-up.
+    function selfAssignableRoles() {
+      return ['READER', 'AUTHOR', 'BOOK_CLUB_MEMBER'];
+    }
+
+    // Validation for `create`. `resource` is null on create, so this must not
+    // read it. A create with no `role` key is the plain profile sync and is
+    // allowed; a create that does carry a role must be self-assignable.
+    function roleValidOnCreate() {
+      return !request.resource.data.keys().hasAll(['role'])
+        || request.resource.data.role in selfAssignableRoles();
+    }
+
+    // Validation for `update`, where `resource` holds the existing document.
+    // Written as a single expression: Firestore rules functions have no `if`
+    // statement and permit only one `return`.
+    function roleValidOnUpdate() {
+      // A merge that omits `role` leaves the stored role untouched — the
+      // profile sync does exactly this. Safe by construction.
+      return !request.resource.data.keys().hasAll(['role'])
+        || (
+          request.resource.data.role in selfAssignableRoles()
+          && (
+            // No role assigned yet: this is the first assignment.
+            !resource.data.keys().hasAll(['role'])
+            // Role already exists and must not change.
+            || resource.data.role == request.resource.data.role
+          )
+        );
+    }
+
+    // ── Users ───────────────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+
+      // create covers the first profile sync; update covers every later merge.
+      allow create: if isOwner(uid) && roleValidOnCreate();
+      allow update: if isOwner(uid) && roleValidOnUpdate();
+      allow delete: if false;
+
+      // ── Per-user subcollections ───────────────────────────────────────────
+      // Owner-only, no cross-user access. Server-set fields are not relied on
+      // here: ownership is proven by the document path, which the client cannot
+      // forge, so a spoofed `userId` field inside the payload is inert.
+
+      match /reading_progress/{bookId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /book_logs/{logId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /bookshelf/{bookId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /custom_shelves/{shelfId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // ── Ownership ───────────────────────────────────────────────────────────
+    // Covers both Google and anonymous sign-in: anonymous users carry a real
+    // `request.auth.uid`, so they are owners of their own subtree like any
+    // other authenticated account.
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

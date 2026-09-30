@@ -269,12 +269,6 @@ fun LoginScreen(
                         icon = Icons.Default.Groups,
                         title = "Book Club Member",
                         subtitle = "Join reading groups, discuss\nchapters & vote on next reads"
-                    ),
-                    RoleOption(
-                        role = UserRole.ADMIN,
-                        icon = Icons.Default.AdminPanelSettings,
-                        title = "Atomic Shelf Team",
-                        subtitle = "Full access: analytics, ARC oversight,\nBookmark fulfilment & author tools"
                     )
                 )
 
@@ -283,6 +277,17 @@ fun LoginScreen(
                         RoleCard(option = option, onSelect = { onRoleSelected(option.role) })
                     }
                 }
+
+                // ADMIN is intentionally absent from the picker above. It is a
+                // privilege claim, not a user preference: self-selecting it would
+                // let any account grant itself staff access, because the client
+                // is not a trust boundary. Staff accounts are granted out of
+                // band by writing the user document server-side (Firebase
+                // console or Admin SDK), and firestore.rules refuses the role
+                // from the client on create.
+                //
+                // Re-adding it here without a corresponding server-side control
+                // is a privilege-escalation bug, not a UI regression.
             }
         }
     }

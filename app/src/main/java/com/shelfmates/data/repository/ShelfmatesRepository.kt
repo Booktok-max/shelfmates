@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.shelfmates.data.repository
 
 import com.shelfmates.data.local.ArcApplicationEntity
@@ -40,7 +42,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -56,11 +60,38 @@ class ShelfmatesRepository(private val dao: ShelfmatesDao) {
     private val _cloudSyncState = MutableStateFlow<CloudSyncState>(CloudSyncState.Idle)
     val cloudSyncState: Flow<CloudSyncState> = _cloudSyncState.asStateFlow()
 
-    // Current active user ID (defaults to Ray, can switch to Priya or Jamie for persona testing)
-    var currentUserId: String = "user_ray"
+    /**
+     * The account whose local rows the app currently reads and writes.
+     *
+     * Backed by a StateFlow because several collectors below are created once,
+     * at ViewModel construction, and must re-target when sign-in changes the
+     * active account instead of staying frozen on the value they captured.
+     *
+     * Seeded from the signed-in Firebase uid where one exists. This is a plain
+     * local-database key, NOT an auth token: Room holds the offline cache and
+     * Firestore is the system of record (see FirebaseService).
+     */
+    private val _currentUserId = MutableStateFlow(
+        firebaseService.getCurrentFirebaseUser()?.uid ?: DEMO_FALLBACK_USER_ID
+    )
 
-    val currentUser: Flow<UserEntity?>
-        get() = dao.getUser(currentUserId)
+    /** Reactive handle: collectors use this to follow sign-in changes. */
+    val currentUserIdFlow: StateFlow<String> = _currentUserId.asStateFlow()
+
+    /** Snapshot of the active account id, for one-shot reads and writes. */
+    val currentUserId: String
+        get() = _currentUserId.value
+
+    /**
+     * Points the repository at [userId]: the Firebase uid on sign-in/sign-out,
+     * or a demo persona from the debug-only switcher.
+     */
+    fun setActiveUser(userId: String) {
+        _currentUserId.value = userId
+    }
+
+    val currentUser: Flow<UserEntity?> =
+        currentUserIdFlow.flatMapLatest { dao.getUser(it) }
 
     val allAuthors: Flow<List<UserEntity>> = dao.getAllAuthors()
     val allPublicClubs: Flow<List<PublicClubEntity>> = dao.getAllPublicClubs()
@@ -136,8 +167,10 @@ class ShelfmatesRepository(private val dao: ShelfmatesDao) {
         dao.deleteReadingProgress(bookId)
     }
 
+    /** Debug persona switching only; prefer [setActiveUser]. */
+    @Deprecated("Use setActiveUser; retained for the debug persona switcher")
     suspend fun switchActiveUser(userId: String) {
-        currentUserId = userId
+        setActiveUser(userId)
     }
 
     suspend fun joinPublicClub(clubId: String, join: Boolean) {
@@ -937,19 +970,19 @@ class ShelfmatesRepository(private val dao: ShelfmatesDao) {
     }
 
     // --- Virtual Bookshelf / Saved Books ---
-    fun getSavedBooks(userId: String = currentUserId): Flow<List<SavedBookEntity>> {
-        return dao.getSavedBooks(userId)
-    }
+    fun getSavedBooks(userId: String = currentUserId): Flow<List<SavedBookEntity>> =
+        currentUserIdFlow.flatMapLatest { dao.getSavedBooks(userId) }
 
     fun getSavedBooksByCategory(userId: String = currentUserId, category: String): Flow<List<SavedBookEntity>> {
         return dao.getSavedBooksByCategory(userId, category)
     }
 
-    fun getSavedBooksMap(userId: String = currentUserId): Flow<Map<String, String>> {
-        return dao.getSavedBooks(userId).map { list ->
-            list.associate { it.googleBooksId to it.category }
+    fun getSavedBooksMap(userId: String = currentUserId): Flow<Map<String, String>> =
+        currentUserIdFlow.flatMapLatest { _ ->
+            dao.getSavedBooks(userId).map { list ->
+                list.associate { it.googleBooksId to it.category }
+            }
         }
-    }
 
     suspend fun saveGoogleBookToShelf(
         user: UserEntity,
@@ -1097,9 +1130,8 @@ class ShelfmatesRepository(private val dao: ShelfmatesDao) {
     }
 
     // --- Custom Shelves Management ---
-    fun getCustomShelves(userId: String = currentUserId): Flow<List<CustomShelfEntity>> {
-        return dao.getCustomShelves(userId)
-    }
+    fun getCustomShelves(userId: String = currentUserId): Flow<List<CustomShelfEntity>> =
+        currentUserIdFlow.flatMapLatest { dao.getCustomShelves(userId) }
 
     suspend fun createCustomShelf(
         name: String,
@@ -1279,6 +1311,16 @@ class ShelfmatesRepository(private val dao: ShelfmatesDao) {
 
     suspend fun flagArcApplicationForAdmin(applicationId: String, flagged: Boolean) {
         dao.flagArcApplicationForAdmin(applicationId, flagged)
+    }
+
+    private companion object {
+        /**
+         * Local-database key used before anyone signs in, and in debug builds where
+         * the demo personas exist. Deliberately NOT a real uid: in release this
+         * matches no row, so an unauthenticated user sees an empty app rather than
+         * someone else's data.
+         */
+        const val DEMO_FALLBACK_USER_ID = "signed_out"
     }
 }
 

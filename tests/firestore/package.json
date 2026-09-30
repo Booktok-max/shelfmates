@@ -1,0 +1,15 @@
+{
+  "name": "shelfmates-firestore-rules-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Emulator tests for shelfmates firestore.rules",
+  "scripts": {
+    "pretest": "node stage-rules.js",
+    "test": "firebase emulators:exec --only firestore --project demo-shelfmates \"mocha --exit rules.test.js\""
+  },
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase-admin": "^13.10.0",
+    "mocha": "^11.8.0"
+  }
+}

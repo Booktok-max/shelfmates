@@ -1,8 +1,11 @@
 package com.shelfmates.ui.viewmodel
 
 import android.app.Application
+import android.util.Log
+
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.shelfmates.BuildConfig
 import com.shelfmates.data.local.AppDatabase
 import com.shelfmates.data.local.ArcApplicationEntity
 import com.shelfmates.data.local.ArcClubEntity
@@ -134,7 +137,7 @@ data class ShelfmatesUiState(
 
 class ShelfmatesViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val database = AppDatabase.getDatabase(application, viewModelScope)
+    private val database = AppDatabase.getDatabase(application)
     private val repository = ShelfmatesRepository(database.shelfmatesDao())
     val readingProgressRepository: ReadingProgressRepository = ReadingProgressRepositoryImpl(database.readingProgressDao())
 
@@ -273,7 +276,23 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.value = _uiState.value.copy(selectedThreadId = threadId)
     }
 
+    /**
+     * Debug-only persona switcher: re-points the local database at one of the
+     * demo users from SeedData so screens can be exercised without signing in
+     * as several accounts.
+     *
+     * Refused in release builds. It assigns
+     * [ShelfmatesRepository.currentUserId] from an arbitrary string, which would
+     * let anyone with a release build read another account's local rows. It also
+     * has no meaning in release: the demo database is only seeded in debug (see
+     * app/src/release/.../SeedData.kt), so there are no personas to switch to.
+     */
     fun switchUserPersona(userId: String) {
+        if (!BuildConfig.DEBUG) {
+            Log.w(TAG_PERSONA, "Refused persona switch in a release build")
+            return
+        }
+
         viewModelScope.launch {
             repository.switchActiveUser(userId)
             val name = when(userId) {
@@ -308,7 +327,22 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /**
+     * Sets the active user's role and syncs it to Firestore.
+     *
+     * [UserRole.ADMIN] is refused here as well as in firestore.rules. The UI no
+     * longer offers it, but this ViewModel is not the only thing that can call
+     * this method, and a role assignment that fails server-side is worse than one
+     * that fails loudly and locally.
+     */
     fun setUserRole(role: UserRole) {
+        if (role == UserRole.ADMIN) {
+            _uiState.value = _uiState.value.copy(
+                userFeedbackMessage = "This role can only be granted by the Atomic Shelf team."
+            )
+            return
+        }
+
         _userRole.value = role
         viewModelScope.launch {
             firebaseService.getCurrentFirebaseUser()?.uid?.let { uid ->
@@ -804,7 +838,10 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
             )
 
             // Sync to Firebase Firestore
-            val uid = firebaseService.getCurrentFirebaseUser()?.uid ?: "user_reader_1"
+            // Only sync under a real, signed-in uid. The previous fallback wrote into a
+            // fixed demo namespace, so an unauthenticated session could write rows
+            // that firestore.rules attributes to that account.
+            val uid = firebaseService.getCurrentFirebaseUser()?.uid ?: return@launch
             firebaseService.syncReadingProgressToFirestore(uid, progressEntity)
         }
     }
@@ -839,6 +876,8 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             val result = firebaseService.signInWithGoogle(context)
             result.onSuccess { user ->
+                // Point the local Room queries at this account now that it exists.
+                user?.let { repository.setActiveUser(it.uid) }
                 _uiState.value = _uiState.value.copy(
                     userFeedbackMessage = "Welcome ${user?.displayName ?: "Reader"}! Synced with Firebase Auth."
                 )
@@ -854,6 +893,7 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             val result = firebaseService.signInAnonymously()
             result.onSuccess { user ->
+                user?.let { repository.setActiveUser(it.uid) }
                 _uiState.value = _uiState.value.copy(
                     userFeedbackMessage = "Signed in as Guest with Firebase Firestore persistence."
                 )
@@ -863,6 +903,10 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
 
     fun signOutFirebase() {
         firebaseService.signOut()
+        // Stop reading the signed-out account's local rows. Without this the
+        // previous user's shelf stays on screen behind the login gate.
+        repository.setActiveUser(SIGNED_OUT_USER_ID)
+        _userRole.value = null
         _uiState.value = _uiState.value.copy(
             userFeedbackMessage = "Signed out of Firebase."
         )
@@ -1351,5 +1395,15 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
     override fun onCleared() {
         super.onCleared()
         geminiLiveVoiceService.destroy()
+    }
+
+    private companion object {
+        const val TAG_PERSONA = "ShelfmatesViewModel"
+
+        /**
+         * Local-database key used while nobody is signed in. Matches no seeded
+         * row, so the UI falls back to empty states instead of demo content.
+         */
+        const val SIGNED_OUT_USER_ID = "signed_out"
     }
 }
