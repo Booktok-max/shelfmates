@@ -95,3 +95,17 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+      # Exercises the R8/ProGuard rules in app/proguard-rules.pro without
+      # changing isMinifyEnabled in the release build type.
+      #
+      # This is the gate that makes turning minification on safe rather than
+      # hopeful: R8 silently strips classes that are only reached reflectively
+      # (Moshi adapters, Retrofit interfaces, Room entities, Firestore), and
+      # the failure shows up as a runtime crash on a user's device, not as a
+      # build error. Running the task here turns that into a build failure.
+      #
+      # Kept separate from assembleRelease so a signing-key problem cannot mask
+      # a shrinker problem, and so this step needs no secrets.
+      - name: Verify R8 shrinker rules
+        run: ./gradlew :app:minifyReleaseWithR8

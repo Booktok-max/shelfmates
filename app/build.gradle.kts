@@ -79,7 +79,24 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      // R8 shrinking + obfuscation ON.
+      //
+      // app/proguard-rules.pro keeps the load-bearing reflective surface:
+      // Retrofit interfaces, the Moshi model package, the epublib fork, and
+      // logging-interceptor constants. Firebase, OkHttp, Coil and Room ship
+      // their own consumer rules and are not duplicated there.
+      //
+      // Those rules are exercised by the :app:minifyReleaseWithR8 step in
+      // .github/workflows/ci.yml, so a missing keep rule fails the build rather
+      // than surfacing as a crash on a user's device.
+      //
+      // Enabling this is also what CREATES the minifyReleaseWithR8 task: with
+      // minification off the task does not exist, so the CI gate would have
+      // nothing to run and would pass without checking anything.
+      isMinifyEnabled = true
+      // Resource shrinking requires minification. Without it the APK carries
+      // resources that no surviving code references.
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
@@ -161,7 +178,18 @@ dependencies {
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   implementation(libs.folioreader.core) {
+    // The Android platform already provides org.xmlpull.v1 (XmlPullParser,
+    // XmlSerializer) as part of the framework, so any bundled copy is a
+    // duplicate. kxml2 arrives transitively and ships its own copies of both
+    // interfaces, which R8 rejects outright:
+    //
+    //   ERROR: R8: Library class android.content.res.XmlResourceParser
+    //   implements program class org.xmlpull.v1.XmlPullParser
+    //
+    // Excluding it is the fix; -dontwarn cannot suppress a hard type conflict.
+    // epublib resolves against the platform implementation at runtime.
     exclude(group = "xmlpull", module = "xmlpull")
+    exclude(group = "net.sf.kxml", module = "kxml2")
   }
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
