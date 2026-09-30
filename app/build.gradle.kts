@@ -176,6 +176,7 @@ dependencies {
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.espresso.core)
   androidTestImplementation(libs.androidx.junit)
+  androidTestImplementation(libs.androidx.room.testing)
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
@@ -185,4 +186,16 @@ dependencies {
 
 tasks.matching { it.name.startsWith("ksp") && it.name.contains("UnitTest") }.configureEach {
   enabled = false
+}
+
+// ── Room schema export ────────────────────────────────────────────────────
+// AppDatabase sets exportSchema = true, which makes KSP write each version's
+// schema JSON here. Those files are the input to MigrationTestHelper and the
+// only way to know, without guessing, what a past schema actually contained.
+// They are committed deliberately: a migration test cannot run without them.
+//
+// Removing this block costs every future migration its reference point, and
+// makes the next breaking schema change undetectable until it has shipped.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
