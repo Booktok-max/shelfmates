@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      The release variant installs the reCAPTCHA App Check provider. It must
+      never reference DebugAppCheckProviderFactory: firebase-appcheck-debug is
+      a debugImplementation dependency, so that class is absent from the
+      release classpath and a reference to it would fail the release compile.
+    -->
+    <application
+        android:name=".ReleaseShelfmatesApp"
+        tools:replace="android:name" />
+
+</manifest>

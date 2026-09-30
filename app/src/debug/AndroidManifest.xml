@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      The debug variant installs the App Check debug provider, which is only on
+      the debug classpath. Declared here so the release manifest can point at
+      its own class without the two colliding.
+    -->
+    <application
+        android:name=".DebugShelfmatesApp"
+        tools:replace="android:name" />
+
+</manifest>

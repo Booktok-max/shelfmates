@@ -335,10 +335,25 @@ describe("users/{uid} subcollections", () => {
         );
       });
 
-      it("ignores a spoofed userId field in the payload", async () => {
-        // Ownership comes from the path, not the payload. Mallory may write
-        // into her OWN subtree, and the forged userId there is inert.
+      it("accepts a userId that matches the owning path", async () => {
+        // This is what the app actually writes: every sync sets userId to the
+        // same uid the document is nested under.
         await assertSucceeds(
+          client(MALLORY)
+            .collection("users")
+            .doc(MALLORY)
+            .collection(name)
+            .doc(docId)
+            .set({ userId: MALLORY, value: 1 }, { merge: true })
+        );
+      });
+
+      it("refuses a userId pointing at another account", async () => {
+        // The path is what grants access, so a spoofed userId cannot buy
+        // access to Alice. It is refused anyway so stored rows can never
+        // contradict their own location -- a document under Mallory that
+        // claims to be Alice's is a data-integrity defect.
+        await assertFails(
           client(MALLORY)
             .collection("users")
             .doc(MALLORY)
@@ -347,8 +362,147 @@ describe("users/{uid} subcollections", () => {
             .set({ userId: ALICE, value: 1 }, { merge: true })
         );
       });
+
+      it("accepts a write that omits userId entirely", async () => {
+        await assertSucceeds(
+          client(MALLORY)
+            .collection("users")
+            .doc(MALLORY)
+            .collection(name)
+            .doc(docId)
+            .set({ value: 1 }, { merge: true })
+        );
+      });
     });
   }
+});
+
+describe("users/{uid} — profile ownership field", () => {
+  it("accepts a uid matching the document path", async () => {
+    // syncUserProfileToFirestore writes "uid" to user.uid and stores it at
+    // users/{user.uid}, so the two always agree in the real client.
+    await assertSucceeds(
+      client(ALICE)
+        .collection("users")
+        .doc(ALICE)
+        .set({ uid: ALICE, email: "alice@example.com" }, { merge: true })
+    );
+  });
+
+  it("REFUSES a profile whose uid points at another account", async () => {
+    // Nothing in the app reads this field back, so it grants no access -- but
+    // storing Alice's uid on Mallory's document is a contradiction that would
+    // mislead any future consumer (admin tooling, export, moderation view).
+    await assertFails(
+      client(MALLORY)
+        .collection("users")
+        .doc(MALLORY)
+        .set({ uid: ALICE, email: "mallory@example.com" }, { merge: true })
+    );
+  });
+
+  it("refuses a uid change on an existing document", async () => {
+    await assertSucceeds(
+      client(ALICE)
+        .collection("users")
+        .doc(ALICE)
+        .set({ uid: ALICE, role: "READER" }, { merge: true })
+    );
+    await assertFails(
+      client(ALICE)
+        .collection("users")
+        .doc(ALICE)
+        .set({ uid: MALLORY }, { merge: true })
+    );
+  });
+
+  it("accepts a profile with no uid field at all", async () => {
+    // A minimal profile must not be blocked just for omitting the field.
+    await assertSucceeds(
+      client(ALICE)
+        .collection("users")
+        .doc(ALICE)
+        .set({ displayName: "Alice" }, { merge: true })
+    );
+  });
+});
+
+describe("anonymous authentication", () => {
+  // The app exposes "Continue as Guest" (ProfileScreen -> signInAnonymously),
+  // and an anonymous Firebase user carries a real request.auth.uid. Guests must
+  // therefore own a subtree like any other account, and must be unable to reach
+  // anyone else's. These tests pin that down: it is a deliberate property, not
+  // an accident, and a future "deny anonymous" rule would break the guest flow.
+
+  const GUEST = "guest_uid";
+
+  it("allows a guest to create their own profile", async () => {
+    await assertSucceeds(
+      client(GUEST)
+        .collection("users")
+        .doc(GUEST)
+        .set({ uid: GUEST, isAnonymous: true, displayName: "Guest Reader" }, { merge: true })
+    );
+  });
+
+  it("allows a guest to write their own shelf", async () => {
+    await assertSucceeds(
+      client(GUEST)
+        .collection("users")
+        .doc(GUEST)
+        .collection("bookshelf")
+        .doc("gbook_1")
+        .set({ userId: GUEST, title: "Dune" }, { merge: true })
+    );
+  });
+
+  it("allows a guest to pick a self-service role", async () => {
+    await assertSucceeds(
+      client(GUEST)
+        .collection("users")
+        .doc(GUEST)
+        .set({ role: "READER" }, { merge: true })
+    );
+  });
+
+  it("REFUSES a guest self-assigning ADMIN", async () => {
+    await assertFails(
+      client(GUEST)
+        .collection("users")
+        .doc(GUEST)
+        .set({ role: "ADMIN" }, { merge: true })
+    );
+  });
+
+  it("REFUSES a guest reading a real user's data", async () => {
+    await asAdmin((db) =>
+      db
+        .collection("users")
+        .doc(ALICE)
+        .collection("bookshelf")
+        .doc("gbook_1")
+        .set({ userId: ALICE, title: "Dune" })
+    );
+    await assertFails(
+      client(GUEST)
+        .collection("users")
+        .doc(ALICE)
+        .collection("bookshelf")
+        .doc("gbook_1")
+        .get()
+    );
+  });
+
+  it("REFUSES a guest writing into a real user's data", async () => {
+    await assertFails(
+      client(GUEST)
+        .collection("users")
+        .doc(ALICE)
+        .collection("bookshelf")
+        .doc("gbook_1")
+        .set({ title: "Injected" }, { merge: true })
+    );
+  });
 });
 
 describe("unmatched paths", () => {

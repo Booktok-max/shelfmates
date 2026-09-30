@@ -1,0 +1,14 @@
+# Firebase project aliases for the Firebase CLI.
+#
+# Replace the placeholder with the real production project id before running
+# `firebase deploy --only firestore:rules`. It is deliberately NOT filled in
+# here: committing a live project id makes it easy to deploy against production
+# by accident from a fresh clone.
+#
+# With no ids listed, the CLI prompts for one and writes it back to this file
+# only if you confirm -- so the first deploy is an explicit choice.
+{
+  "projects": {
+    "default": "REPLACE_WITH_FIREBASE_PROJECT_ID"
+  }
+}

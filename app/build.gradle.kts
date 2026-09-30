@@ -63,6 +63,14 @@ android {
       .getOrElse("")
     buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
 
+    // Firebase App Check reCAPTCHA v3 site key (see initializeAppCheckSafely
+    // in ShelfmatesApp). Empty by default: App Check is skipped rather than
+    // installed with a broken key, so an unconfigured build still starts.
+    val recaptchaSiteKey = providers.environmentVariable("RECAPTCHA_SITE_KEY")
+      .orElse(providers.gradleProperty("RECAPTCHA_SITE_KEY"))
+      .getOrElse("")
+    buildConfigField("String", "RECAPTCHA_SITE_KEY", "\"$recaptchaSiteKey\"")
+
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
@@ -169,7 +177,12 @@ dependencies {
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
   implementation(libs.firebase.appcheck.recaptcha)
-  implementation(libs.firebase.appcheck.debug)
+  // DEBUG SCOPE ONLY. DebugAppCheckProviderFactory hands out a token that
+  // App Check accepts unconditionally, so shipping it in a release build would
+  // let anyone produce valid App Check tokens from a tampered APK and defeat
+  // app attestation entirely. debugImplementation keeps it out of release
+  // while still letting ShelfmatesApp compile the debug branch.
+  debugImplementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)

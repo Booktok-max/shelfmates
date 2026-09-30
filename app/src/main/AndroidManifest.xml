@@ -6,8 +6,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- android:name is supplied per variant: .DebugShelfmatesApp in
+    src/debug, .ReleaseShelfmatesApp in src/release. ShelfmatesApp
+    itself is abstract; the shared Firebase initialization is
+    inherited by both concrete subclasses. -->
     <application
-        android:name=".ShelfmatesApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
