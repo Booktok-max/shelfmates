@@ -11,6 +11,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -44,6 +45,26 @@ class GoogleBooksService {
             }
     }
 
+    /**
+     * Appends the Google Books key to [url] when one is configured and the URL
+     * does not already carry a `key` parameter.
+     *
+     * Extracted from the OkHttp interceptor so the decision is directly testable.
+     * With no key configured -- the default for a build without GOOGLE_BOOKS_KEY,
+     * which BuildConfig leaves as an empty string rather than fabricating a
+     * value -- the URL is returned unchanged and the request still goes out.
+     * That is deliberate: an unconfigured build degrades to unauthenticated
+     * requests instead of sending `key=` to the API.
+     */
+    internal fun withApiKey(url: HttpUrl): HttpUrl {
+        val apiKey = BuildConfig.GOOGLE_BOOKS_KEY.trim()
+        return if (apiKey.isNotEmpty() && url.queryParameter("key") == null) {
+            url.newBuilder().addQueryParameter("key", apiKey).build()
+        } else {
+            url
+        }
+    }
+
     private val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()
@@ -52,20 +73,11 @@ class GoogleBooksService {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .addInterceptor { chain ->
-            val original = chain.request()
-            val apiKey = BuildConfig.GOOGLE_BOOKS_KEY.trim()
-
-            // Only append key if not already present — no Android restriction headers
-            val newUrl = if (apiKey.isNotEmpty() &&
-                original.url.queryParameter("key") == null) {
-                original.url.newBuilder()
-                    .addQueryParameter("key", apiKey)
+            chain.proceed(
+                chain.request().newBuilder()
+                    .url(withApiKey(chain.request().url))
                     .build()
-            } else {
-                original.url
-            }
-
-            chain.proceed(original.newBuilder().url(newUrl).build())
+            )
         }
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
