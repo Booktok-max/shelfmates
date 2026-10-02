@@ -148,6 +148,22 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
     private val _userRole = MutableStateFlow<UserRole?>(null)
     val userRole: StateFlow<UserRole?> = _userRole.asStateFlow()
 
+    // Authentication progress and failure state for the login gate.
+    //
+    // Auth failures used to be written only to userFeedbackMessage, which only
+    // MainScreen renders. MainScreen is withheld until the gate is passed, so a
+    // failed sign-in showed the user nothing at all: the button was tapped and
+    // no feedback ever appeared.
+    private val _isAuthenticating = MutableStateFlow(false)
+    val isAuthenticating: StateFlow<Boolean> = _isAuthenticating.asStateFlow()
+
+    private val _authErrorMessage = MutableStateFlow<String?>(null)
+    val authErrorMessage: StateFlow<String?> = _authErrorMessage.asStateFlow()
+
+    fun clearAuthError() {
+        _authErrorMessage.value = null
+    }
+
     // Data streams
     val currentUser = repository.currentUser
     val allPublicClubs = repository.allPublicClubs
@@ -873,6 +889,8 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
     val firebaseAuthState = firebaseService.authState
 
     fun signInWithGoogle(context: Context) {
+        _authErrorMessage.value = null
+        _isAuthenticating.value = true
         viewModelScope.launch {
             val result = firebaseService.signInWithGoogle(context)
             result.onSuccess { user ->
@@ -882,22 +900,45 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
                     userFeedbackMessage = "Welcome ${user?.displayName ?: "Reader"}! Synced with Firebase Auth."
                 )
             }.onFailure { err ->
-                _uiState.value = _uiState.value.copy(
-                    userFeedbackMessage = "Auth: ${err.message}"
-                )
+                _authErrorMessage.value = err.message ?: "Google Sign-In failed."
             }
+            _isAuthenticating.value = false
         }
     }
 
+    /**
+     * Signs in anonymously. This is the mechanism behind "Continue as Guest".
+     *
+     * That button used to reveal the role picker without ever calling this, so
+     * no session was ever created and the gate sent the user straight back to
+     * the sign-in form. The gate advances on the session this produces, never
+     * on the role selection that follows it.
+     */
     fun signInAnonymously() {
+        _authErrorMessage.value = null
+        _isAuthenticating.value = true
         viewModelScope.launch {
             val result = firebaseService.signInAnonymously()
             result.onSuccess { user ->
-                user?.let { repository.setActiveUser(it.uid) }
-                _uiState.value = _uiState.value.copy(
-                    userFeedbackMessage = "Signed in as Guest with Firebase Firestore persistence."
-                )
+                if (user == null) {
+                    // FirebaseService reports success with a null user when Auth
+                    // is unavailable. No user means no session, so treating this
+                    // as a finished sign-in would strand the user on the gate
+                    // with no explanation.
+                    _authErrorMessage.value =
+                        "Could not start a guest session. Firebase Authentication is not configured for this build."
+                } else {
+                    repository.setActiveUser(user.uid)
+                    _uiState.value = _uiState.value.copy(
+                        userFeedbackMessage = "Signed in as Guest with Firebase Firestore persistence."
+                    )
+                }
+            }.onFailure { err ->
+                // This branch did not exist before, so a rejected guest sign-in
+                // was dropped silently.
+                _authErrorMessage.value = err.message ?: "Could not continue as guest."
             }
+            _isAuthenticating.value = false
         }
     }
 

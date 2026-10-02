@@ -11,6 +11,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.shelfmates.ui.AuthDestination
+import com.shelfmates.ui.resolveAuthDestination
 import com.shelfmates.ui.screens.LoginScreen
 import com.shelfmates.ui.screens.MainScreen
 import com.shelfmates.ui.theme.MyApplicationTheme
@@ -29,21 +31,32 @@ class MainActivity : ComponentActivity() {
 
                     val authState by viewModel.firebaseAuthState.collectAsStateWithLifecycle()
                     val userRole by viewModel.userRole.collectAsStateWithLifecycle()
-                    val isLoggedIn = authState.isAuthenticated
+                    val isSignedIn = authState.isAuthenticated
+                    val isAuthenticating by viewModel.isAuthenticating.collectAsStateWithLifecycle()
+                    val authError by viewModel.authErrorMessage.collectAsStateWithLifecycle()
 
-                    LaunchedEffect(isLoggedIn) {
-                        if (isLoggedIn) {
+                    LaunchedEffect(isSignedIn) {
+                        if (isSignedIn) {
                             viewModel.loadUserRole()
                         }
                     }
 
-                    if (!isLoggedIn || userRole == null) {
-                        LoginScreen(
+                    // MainScreen is reachable only with a real session AND a role.
+                    // A role on its own is not a login: it has no uid to be saved
+                    // under, so treating it as one would let an unauthenticated
+                    // user straight into the app.
+                    when (resolveAuthDestination(isSignedIn, userRole)) {
+                        AuthDestination.MAIN -> MainScreen(viewModel = viewModel)
+                        AuthDestination.SIGN_IN, AuthDestination.ROLE_SELECTION -> LoginScreen(
                             onRoleSelected = { role -> viewModel.setUserRole(role) },
-                            onGoogleSignIn = { viewModel.signInWithGoogle(this@MainActivity) }
+                            onGoogleSignIn = { viewModel.signInWithGoogle(this@MainActivity) },
+                            // "Continue as Guest" previously only revealed the role
+                            // picker, so no session was ever created.
+                            onGuestSignIn = { viewModel.signInAnonymously() },
+                            isAuthenticated = isSignedIn,
+                            isLoading = isAuthenticating,
+                            errorMessage = authError
                         )
-                    } else {
-                        MainScreen(viewModel = viewModel)
                     }
                 }
             }

@@ -43,13 +43,21 @@ import com.shelfmates.ui.theme.*
 fun LoginScreen(
     onRoleSelected: (UserRole) -> Unit,
     onGoogleSignIn: () -> Unit = {},
+    onGuestSignIn: () -> Unit = {},
+    isAuthenticated: Boolean = false,
     isLoading: Boolean = false,
     errorMessage: String? = null
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var showRolePicker by remember { mutableStateOf(false) }
+    var rolePickerRequested by remember { mutableStateOf(false) }
+
+    // The role step opens once a Firebase session exists, not merely because
+    // a button was tapped. That is what makes the guest route honest:
+    // choosing a role cannot stand in for a completed sign-in, because
+    // MainActivity still requires a real session before MainScreen renders.
+    val showRolePicker = rolePickerRequested || isAuthenticated
 
     Box(
         modifier = Modifier
@@ -165,7 +173,7 @@ fun LoginScreen(
                         Spacer(modifier = Modifier.height(20.dp))
 
                         Button(
-                            onClick = { showRolePicker = true },
+                            onClick = { rolePickerRequested = true },
                             enabled = !isLoading,
                             colors = ButtonDefaults.buttonColors(containerColor = ShelfmatesGold),
                             shape = RoundedCornerShape(12.dp),
@@ -212,6 +220,7 @@ fun LoginScreen(
                 // Google sign-in
                 OutlinedButton(
                     onClick = onGoogleSignIn,
+                    enabled = !isLoading,
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp, Color.White.copy(alpha = 0.4f)
                     ),
@@ -225,7 +234,7 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                TextButton(onClick = { showRolePicker = true }) {
+                TextButton(onClick = onGuestSignIn, enabled = !isLoading) {
                     Text(
                         "Continue as Guest",
                         color = Color.White.copy(alpha = 0.6f),
