@@ -100,7 +100,7 @@ data class EbookReaderUiState(
 class EbookReaderViewModel(
     application: Application,
     private val readingProgressRepository: ReadingProgressRepository = ReadingProgressRepositoryImpl(
-        AppDatabase.getDatabase(application, kotlinx.coroutines.GlobalScope).readingProgressDao()
+        AppDatabase.getDatabase(application).readingProgressDao()
     )
 ) : AndroidViewModel(application) {
 
@@ -515,7 +515,7 @@ class EbookReaderViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(EbookReaderViewModel::class.java)) {
             val repo = readingProgressRepository ?: ReadingProgressRepositoryImpl(
-                AppDatabase.getDatabase(application, kotlinx.coroutines.GlobalScope).readingProgressDao()
+                AppDatabase.getDatabase(application).readingProgressDao()
             )
             return EbookReaderViewModel(application, repo) as T
         }

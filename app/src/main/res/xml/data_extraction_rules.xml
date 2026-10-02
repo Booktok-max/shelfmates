@@ -1,19 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
+   Data extraction rules (Android 12+ / API 31+).
+
    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+
+   The `<exclude>` entries below are load-bearing, not boilerplate. Two domains
+   are held back from both cloud backup and device transfer:
+
+   database   The Room database (shelfmates_database). This holds the bookmark
+              wallet, redemption requests and reading progress. Backup rules are
+              file-granular, so excluding the database also excludes reading
+              progress: there is no way to keep the rows a user would want to
+              carry to a new device while dropping the virtual-currency ledger.
+              If cross-device reading progress becomes a requirement, the fix is
+              to split the ledger/tables into a separate database file and keep
+              this one excluded. See app/src/main/java/com/shelfmates/data/local.
+
+   sharedpref Firebase Auth persists its session here. Backing it up would put
+              bearer tokens in the user's cloud backup. The app itself stores no
+              preferences of its own, so excluding the domain costs nothing.
+
+   cacheDir is already excluded by Auto Backup by default, which covers the
+   Supabase manuscript cache written by SupabaseStorageService.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
     </device-transfer>
-    -->
 </data-extraction-rules>

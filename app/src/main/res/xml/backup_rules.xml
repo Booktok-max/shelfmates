@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
+   Full backup rules for devices older than API 31.
    See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+   Ignored for devices running API 31+, which use data_extraction_rules.xml.
+
+   Kept in sync with data_extraction_rules.xml: the Room database (bookmark
+   wallet, redemption requests, reading progress) and the Firebase Auth session
+   (shared preferences) are excluded from backup.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="database" />
+    <exclude domain="sharedpref" />
 </full-backup-content>
