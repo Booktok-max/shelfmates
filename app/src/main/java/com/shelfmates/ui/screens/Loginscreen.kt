@@ -88,21 +88,34 @@ fun LoginScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Shelfmates",
-                fontSize = 30.sp,
+                text = "Atomic Shelfmates",
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Black,
                 color = Color.White,
                 fontFamily = BookDisplayFont
             )
             Text(
-                text = "Your indie reading community",
+                text = "Discover books, keep your shelves, read, and connect around them.",
                 fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.7f)
+                color = Color.White.copy(alpha = 0.72f)
             )
 
             Spacer(modifier = Modifier.height(40.dp))
 
             if (!showRolePicker) {
+                // One line of orientation before the credentials. The reader
+                // should know what the product is before being asked to
+                // create an account for it. No feature list, no tour.
+                Text(
+                    text = "Sign in to keep your shelves and reading progress across your devices. " +
+                        "You can also continue as a guest and start reading straight away.",
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.66f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
                 // ── Auth form ────────────────────────────────────────────────
                 Card(
                     shape = RoundedCornerShape(20.dp),

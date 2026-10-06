@@ -163,7 +163,6 @@ fun MainScreen(viewModel: ShelfmatesViewModel) {
                         unreadNotifCount = unreadNotifCount,
                         activeVoiceRoom = uiState.activeVoiceRoom,
                         bookmarkBalance = bookmarkWallet.balance,
-                        onSwitchUser = { viewModel.switchUserPersona(it) },
                         onBookmarksRewardsClick = { viewModel.setTab(MainTab.BOOKMARKS_REWARDS) },
                         onNotificationsClick = { viewModel.setTab(MainTab.NOTIFICATIONS) }
                     )
@@ -224,7 +223,7 @@ fun MainScreen(viewModel: ShelfmatesViewModel) {
                         selected = uiState.currentTab == MainTab.CLUBS,
                         onClick = { viewModel.setTab(MainTab.CLUBS) },
                         icon = { Icon(imageVector = Icons.Default.Groups, contentDescription = "My Clubs") },
-                        label = { Text("My Clubs", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
+                        label = { Text("Clubs", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = ShelfmatesDeepBlue,
                             selectedTextColor = ShelfmatesGold,
@@ -316,14 +315,19 @@ fun MainScreen(viewModel: ShelfmatesViewModel) {
                         onCreateThread = { title, body, cat -> currentUser?.let { viewModel.createThread(selectedPublicClub.id, "PUBLIC", it, title, body, cat) } },
                         onSelectThread = { viewModel.selectThread(it) },
                         onReadBook = {
-                            viewModel.openInAppReader(
-                                bookId = selectedPublicClub.id,
-                                title = selectedPublicClub.currentBookTitle,
-                                author = selectedPublicClub.currentBookAuthor,
-                                coverUrl = selectedPublicClub.currentBookCover,
-                                asin = "B09WXYZ890",
-                                isArc = false
-                            )
+                            // Same entity-boundary bug as the Home reader: a club id
+                            // was opened as a book, carrying an ASIN that belonged to
+                            // neither. Open the club's actual current book instead.
+                            if (selectedPublicClub.currentBookId.isNotBlank()) {
+                                viewModel.openInAppReader(
+                                    bookId = selectedPublicClub.currentBookId,
+                                    title = selectedPublicClub.currentBookTitle,
+                                    author = selectedPublicClub.currentBookAuthor,
+                                    coverUrl = selectedPublicClub.currentBookCover,
+                                    asin = "",
+                                    isArc = false
+                                )
+                            }
                         }
                     )
                 }
@@ -408,15 +412,21 @@ fun MainScreen(viewModel: ShelfmatesViewModel) {
                                     )
                                 },
                                 onReadPublicClub = { club ->
-                                    viewModel.openInAppReader(
-                                        bookId = club.id,
-                                        title = club.currentBookTitle,
-                                        author = club.currentBookAuthor,
-                                        coverUrl = club.currentBookCover,
-                                        asin = "B09WXYZ890",
-                                        isArc = false,
-                                        format = "EPUB"
-                                    )
+                                    // Reading a club's book must open THAT book. This
+                                    // passed club.id as the bookId, so the reader's
+                                    // position was keyed to a club row, and carried a
+                                    // hardcoded ASIN matching no real book.
+                                    if (club.currentBookId.isNotBlank()) {
+                                        viewModel.openInAppReader(
+                                            bookId = club.currentBookId,
+                                            title = club.currentBookTitle,
+                                            author = club.currentBookAuthor,
+                                            coverUrl = club.currentBookCover,
+                                            asin = "",
+                                            isArc = false,
+                                            format = "EPUB"
+                                        )
+                                    }
                                 }
                             )
                         }
@@ -566,7 +576,6 @@ fun MainScreen(viewModel: ShelfmatesViewModel) {
                                 onSignInWithGoogle = { viewModel.signInWithGoogle(context) },
                                 onSignInAnonymously = { viewModel.signInAnonymously() },
                                 onSignOut = { viewModel.signOutFirebase() },
-                                onSwitchUser = { viewModel.switchUserPersona(it) },
                                 onNavigateToBookmarks = { viewModel.setTab(MainTab.BOOKMARKS_REWARDS) },
                                 onNavigateToArcOpportunities = { viewModel.setTab(MainTab.ARC_OPPORTUNITIES) },
                                 onOpenCreateArcDialog = { viewModel.openCreateArcDialog() },

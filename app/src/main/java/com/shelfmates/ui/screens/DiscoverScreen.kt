@@ -60,6 +60,7 @@ import com.shelfmates.ui.components.GoogleBooksCatalogFeed
 import com.shelfmates.ui.components.StatusBadge
 import com.shelfmates.ui.theme.ShelfmatesAmber
 import com.shelfmates.ui.theme.ShelfmatesCoral
+import com.shelfmates.ui.theme.ShelfTitleStyle
 import com.shelfmates.ui.theme.ShelfmatesDeepBlue
 import com.shelfmates.ui.theme.ShelfmatesEmerald
 import com.shelfmates.ui.theme.ShelfmatesGold
@@ -124,11 +125,22 @@ fun DiscoverScreen(
             .fillMaxSize()
             .testTag("discover_screen")
     ) {
+        // Screen title. Discover is a way of FINDING books, so it says so
+        // rather than naming the backends it happens to query.
+        Text(
+            text = "Discover",
+            style = ShelfTitleStyle,
+            modifier = Modifier
+                .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 2.dp)
+                .testTag("discover_title")
+        )
+
         // Tab Row: Public Clubs vs ARC Campaigns vs Google Books API
+        // Index follows the TabRow declaration order below.
         val selectedIndex = when (discoverTab) {
-            DiscoverTab.PUBLIC_CLUBS -> 0
-            DiscoverTab.ARC_CLUBS -> 1
-            DiscoverTab.GOOGLE_BOOKS -> 2
+            DiscoverTab.GOOGLE_BOOKS -> 0
+            DiscoverTab.PUBLIC_CLUBS -> 1
+            DiscoverTab.ARC_CLUBS -> 2
         }
 
         TabRow(
@@ -145,6 +157,27 @@ fun DiscoverScreen(
                 }
             }
         ) {
+            Tab(
+                selected = discoverTab == DiscoverTab.GOOGLE_BOOKS,
+                onClick = {
+                    onSelectDiscoverTab(DiscoverTab.GOOGLE_BOOKS)
+                    if (googleBooksResults.isEmpty()) {
+                        onPerformGoogleBooksSearch("popular fiction")
+                    }
+                },
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Search", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                },
+                modifier = Modifier.testTag("google_books_tab")
+            )
             Tab(
                 selected = discoverTab == DiscoverTab.PUBLIC_CLUBS,
                 onClick = { onSelectDiscoverTab(DiscoverTab.PUBLIC_CLUBS) },
@@ -172,31 +205,10 @@ fun DiscoverScreen(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("ARC Opportunities", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text("ARCs", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
                 },
                 modifier = Modifier.testTag("arc_clubs_tab")
-            )
-            Tab(
-                selected = discoverTab == DiscoverTab.GOOGLE_BOOKS,
-                onClick = {
-                    onSelectDiscoverTab(DiscoverTab.GOOGLE_BOOKS)
-                    if (googleBooksResults.isEmpty()) {
-                        onPerformGoogleBooksSearch("popular fiction")
-                    }
-                },
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Book Catalog", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                },
-                modifier = Modifier.testTag("google_books_tab")
             )
         }
 

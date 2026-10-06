@@ -250,7 +250,7 @@ fun BookshelfCategorySection(
                                             )
                                             Spacer(modifier = Modifier.width(3.dp))
                                             Text(
-                                                text = "Firestore Synced",
+                                                text = "Synced",
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = ShelfmatesEmerald
@@ -302,7 +302,7 @@ fun BookshelfCategorySection(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Sync Cloud Firestore",
+                            contentDescription = "Sync now",
                             tint = ShelfmatesDeepBlue,
                             modifier = Modifier.size(18.dp)
                         )

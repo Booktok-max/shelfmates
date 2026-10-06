@@ -367,16 +367,35 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /**
+     * Hydrates [userRole] from Firestore for a RETURNING reader.
+     *
+     * This must never clear a role the reader chose in the current session.
+     *
+     * For a brand-new guest there is no `users/{uid}` role document yet, so this
+     * read returns nothing and used to assign `_userRole.value = null`. Because
+     * it runs from `LaunchedEffect(isSignedIn)`, a slow Firestore round-trip
+     * could land AFTER the reader tapped a role on the picker and overwrite it,
+     * bouncing them straight back to role selection -- the same dead end that
+     * made the guest route unusable before it was wired up.
+     *
+     * So: only hydrate when nothing has been chosen yet. A role set in this
+     * session is authoritative over a read that predates it.
+     */
     fun loadUserRole() {
+        if (_userRole.value != null) return
         viewModelScope.launch {
             firebaseService.getCurrentFirebaseUser()?.uid?.let { uid ->
-                val roleName = firebaseService.getUserRole(uid)
-                _userRole.value = roleName?.let {
-                    try {
-                        UserRole.valueOf(it)
-                    } catch (e: IllegalArgumentException) {
-                        null
-                    }
+                val roleName = firebaseService.getUserRole(uid) ?: return@let
+                val role = try {
+                    UserRole.valueOf(roleName)
+                } catch (e: IllegalArgumentException) {
+                    null
+                }
+                // Re-check: the reader may have chosen a role while this read was
+                // in flight, and that choice wins.
+                if (role != null && _userRole.value == null) {
+                    _userRole.value = role
                 }
             }
         }
@@ -897,7 +916,7 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
                 // Point the local Room queries at this account now that it exists.
                 user?.let { repository.setActiveUser(it.uid) }
                 _uiState.value = _uiState.value.copy(
-                    userFeedbackMessage = "Welcome ${user?.displayName ?: "Reader"}! Synced with Firebase Auth."
+                    userFeedbackMessage = "Welcome ${user?.displayName ?: "Reader"}!"
                 )
             }.onFailure { err ->
                 _authErrorMessage.value = err.message ?: "Google Sign-In failed."
@@ -926,11 +945,11 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
                     // as a finished sign-in would strand the user on the gate
                     // with no explanation.
                     _authErrorMessage.value =
-                        "Could not start a guest session. Firebase Authentication is not configured for this build."
+                        "Could not start a guest session. Sign-in is not available right now."
                 } else {
                     repository.setActiveUser(user.uid)
                     _uiState.value = _uiState.value.copy(
-                        userFeedbackMessage = "Signed in as Guest with Firebase Firestore persistence."
+                        userFeedbackMessage = "Signed in as guest. Your shelf will sync when you sign in."
                     )
                 }
             }.onFailure { err ->
@@ -949,7 +968,7 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         repository.setActiveUser(SIGNED_OUT_USER_ID)
         _userRole.value = null
         _uiState.value = _uiState.value.copy(
-            userFeedbackMessage = "Signed out of Firebase."
+            userFeedbackMessage = "Signed out."
         )
     }
 
@@ -1357,7 +1376,7 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
             val result = repository.syncWithFirestoreCloud()
             if (result.isSuccess) {
                 _uiState.value = _uiState.value.copy(
-                    userFeedbackMessage = "Bookshelf successfully synced with Cloud Firestore!"
+                    userFeedbackMessage = "Your shelf is backed up and synced."
                 )
             } else {
                 _uiState.value = _uiState.value.copy(

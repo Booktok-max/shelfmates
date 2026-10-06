@@ -74,11 +74,9 @@ fun ShelfmatesTopAppBar(
     unreadNotifCount: Int,
     activeVoiceRoom: ActiveVoiceRoom?,
     bookmarkBalance: Int = 740,
-    onSwitchUser: (String) -> Unit,
     onBookmarksRewardsClick: () -> Unit = {},
     onNotificationsClick: () -> Unit
 ) {
-    var showUserMenu by remember { mutableStateOf(false) }
 
     Surface(
         color = ShelfmatesDeepBlue,
@@ -154,94 +152,37 @@ fun ShelfmatesTopAppBar(
                         }
                     }
 
-                    // Persona Switcher Chip
-                    Box {
+                    // Identity chip. Intentionally NOT a menu: this used to open a
+                    // "switch demo persona" list (Ray / Priya / Jamie / Elena) from the
+                    // app bar, which is how a demo convenience became product UX and
+                    // how the reader identity could silently change mid-session.
+                    // There is one current user; it is shown, not chosen.
+                    if (currentUser != null) {
                         Surface(
-                            onClick = { showUserMenu = true },
                             shape = RoundedCornerShape(20.dp),
                             color = Color.White.copy(alpha = 0.15f),
                             modifier = Modifier
-                                .testTag("persona_switcher_button")
+                                .testTag("current_identity_chip")
                                 .padding(end = 6.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.SwapHoriz,
-                                    contentDescription = "Switch Persona",
-                                    tint = ShelfmatesGold,
-                                    modifier = Modifier.size(16.dp)
+                                Text(
+                                    text = "👤",
+                                    fontSize = 12.sp
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = currentUser?.displayName?.split(" ")?.firstOrNull() ?: "Ray",
+                                    text = currentUser.displayName
+                                        .substringBefore(' ')
+                                        .ifBlank { "Reader" },
                                     color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                        }
-
-                        DropdownMenu(
-                            expanded = showUserMenu,
-                            onDismissRequest = { showUserMenu = false }
-                        ) {
-                            Text(
-                                text = "  SWITCH DEMO PERSONA",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(8.dp)
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text("Ray K. Vance", fontWeight = FontWeight.Bold)
-                                        Text("Indie Author + Reader (ARC Manager)", fontSize = 11.sp)
-                                    }
-                                },
-                                onClick = {
-                                    onSwitchUser("user_ray")
-                                    showUserMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text("Priya Sharma", fontWeight = FontWeight.Bold)
-                                        Text("Top ARC Reviewer (4-6 books/mo)", fontSize = 11.sp)
-                                    }
-                                },
-                                onClick = {
-                                    onSwitchUser("user_priya")
-                                    showUserMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text("Jamie Miller", fontWeight = FontWeight.Bold)
-                                        Text("Book Club Reader (Casual)", fontSize = 11.sp)
-                                    }
-                                },
-                                onClick = {
-                                    onSwitchUser("user_jamie")
-                                    showUserMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text("Elena Vance", fontWeight = FontWeight.Bold)
-                                        Text("Sci-Fi Indie Author (Author Pro)", fontSize = 11.sp)
-                                    }
-                                },
-                                onClick = {
-                                    onSwitchUser("user_elena")
-                                    showUserMenu = false
-                                }
-                            )
                         }
                     }
 

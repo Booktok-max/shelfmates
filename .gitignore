@@ -49,3 +49,10 @@ debug.keystore
 # intended behaviour for a repository that builds without Firebase secrets.
 app/google-services.json
 google-services.json
+
+# The Firebase CLI writes the active project id back to .firebaserc on first
+# deploy. It is machine-local for the same reason google-services.json is:
+# committing a live project id makes it easy to deploy against production by
+# accident from a fresh clone. Untracked as of the design-system branch; set
+# your own id with `firebase use --add`.
+.firebaserc
