@@ -293,7 +293,11 @@ fun DiscoverScreen(
                     if (filteredPublicClubs.isEmpty()) {
                         item {
                             EmptyStateCard(
-                                message = "No book clubs found matching your search.",
+                                message = if (selectedGenre != "All") {
+                                    "No ${selectedGenre} clubs yet. Browse another genre or start one."
+                                } else {
+                                    "No book clubs found matching your search."
+                                },
                                 actionLabel = "Create New Public Club",
                                 onAction = onCreatePublicClubClick
                             )

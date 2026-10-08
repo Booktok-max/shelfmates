@@ -1,11 +1,9 @@
 package com.shelfmates.ui.viewmodel
 
 import android.app.Application
-import android.util.Log
 
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.shelfmates.BuildConfig
 import com.shelfmates.data.local.AppDatabase
 import com.shelfmates.data.local.ArcApplicationEntity
 import com.shelfmates.data.local.ArcClubEntity
@@ -276,6 +274,24 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.value = _uiState.value.copy(selectedGenre = genre)
     }
 
+    /**
+     * Opens the Discover tab on the Public Clubs feed, pre-filtered to [genre].
+     *
+     * Genre navigation from Home ("Browse clubs by genre") and from the
+     * Google Books catalog goes through here so the genre chip state and the
+     * discover tab always agree with the entry point the user tapped.
+     */
+    fun openDiscoverClubsByGenre(genre: String) {
+        _uiState.value = _uiState.value.copy(
+            currentTab = MainTab.DISCOVER,
+            discoverTab = DiscoverTab.PUBLIC_CLUBS,
+            selectedGenre = genre,
+            searchQuery = "",
+            selectedPublicClubId = null,
+            selectedArcClubId = null
+        )
+    }
+
     fun setSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
     }
@@ -290,38 +306,6 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
 
     fun selectThread(threadId: String?) {
         _uiState.value = _uiState.value.copy(selectedThreadId = threadId)
-    }
-
-    /**
-     * Debug-only persona switcher: re-points the local database at one of the
-     * demo users from SeedData so screens can be exercised without signing in
-     * as several accounts.
-     *
-     * Refused in release builds. It assigns
-     * [ShelfmatesRepository.currentUserId] from an arbitrary string, which would
-     * let anyone with a release build read another account's local rows. It also
-     * has no meaning in release: the demo database is only seeded in debug (see
-     * app/src/release/.../SeedData.kt), so there are no personas to switch to.
-     */
-    fun switchUserPersona(userId: String) {
-        if (!BuildConfig.DEBUG) {
-            Log.w(TAG_PERSONA, "Refused persona switch in a release build")
-            return
-        }
-
-        viewModelScope.launch {
-            repository.switchActiveUser(userId)
-            val name = when(userId) {
-                "user_ray" -> "Ray K. Vance (Author & Reader)"
-                "user_priya" -> "Priya Sharma (ARC Reviewer)"
-                "user_jamie" -> "Jamie Miller (Book Club Reader)"
-                "user_elena" -> "Elena Vance (Sci-Fi Author)"
-                else -> "User"
-            }
-            _uiState.value = _uiState.value.copy(
-                userFeedbackMessage = "Switched active persona to $name"
-            )
-        }
     }
 
     fun getPublicClubDetail(clubId: String) = repository.getPublicClubById(clubId)
@@ -1458,8 +1442,6 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private companion object {
-        const val TAG_PERSONA = "ShelfmatesViewModel"
-
         /**
          * Local-database key used while nobody is signed in. Matches no seeded
          * row, so the UI falls back to empty states instead of demo content.

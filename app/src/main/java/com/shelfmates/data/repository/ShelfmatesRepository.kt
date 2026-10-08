@@ -83,8 +83,12 @@ class ShelfmatesRepository(private val dao: ShelfmatesDao) {
         get() = _currentUserId.value
 
     /**
-     * Points the repository at [userId]: the Firebase uid on sign-in/sign-out,
-     * or a demo persona from the debug-only switcher.
+     * Points the repository at [userId]: the Firebase uid on sign-in/sign-out.
+     *
+     * There is exactly one active reader identity per device. The old debug-only
+     * persona switcher (Ray / Priya / Jamie / Elena) is gone; community members
+     * are other people, not alternative selves, so no other local rows need to
+     * be re-targeted here.
      */
     fun setActiveUser(userId: String) {
         _currentUserId.value = userId
@@ -167,14 +171,15 @@ class ShelfmatesRepository(private val dao: ShelfmatesDao) {
         dao.deleteReadingProgress(bookId)
     }
 
-    /** Debug persona switching only; prefer [setActiveUser]. */
-    @Deprecated("Use setActiveUser; retained for the debug persona switcher")
-    suspend fun switchActiveUser(userId: String) {
-        setActiveUser(userId)
-    }
-
     suspend fun joinPublicClub(clubId: String, join: Boolean) {
         dao.toggleJoinPublicClub(clubId, join)
+        // The local Room flag is the interactive state; Firestore is the
+        // system of record for the reader's membership set. Sync both so the
+        // server-side rules are the authority, not just the join button.
+        val uid = firebaseService.getCurrentFirebaseUser()?.uid
+        if (uid != null) {
+            firebaseService.syncClubMembershipToFirestore(uid, clubId, join)
+        }
     }
 
     suspend fun applyForArc(
@@ -448,6 +453,13 @@ class ShelfmatesRepository(private val dao: ShelfmatesDao) {
             announcement = "Welcome to $name! Introduce yourself in the threads."
         )
         dao.insertPublicClub(publicClub)
+
+        // Creating a club enrols the creator as member #1; keep the Firestore
+        // membership set in lockstep with the local Room row.
+        val uid = firebaseService.getCurrentFirebaseUser()?.uid
+        if (uid != null) {
+            firebaseService.syncClubMembershipToFirestore(uid, clubId, joined = true)
+        }
     }
 
     suspend fun addThreadReply(threadId: String, user: UserEntity, body: String) {
@@ -1225,13 +1237,23 @@ class ShelfmatesRepository(private val dao: ShelfmatesDao) {
 
     suspend fun syncAtomicShelfAnalytics(author: UserEntity): AtomicShelfAnalyticsEntity {
         val clientId = author.asClientId.ifBlank { "AS-CLI-8492" }
-        // Emulate instantaneous synchronization with Google Apps Script Webhook
+        // Emulate instantaneous synchronization with Google Apps Script Webhook.
+        // java.time.LocalDate is API 26+ and core library desugaring is not
+        // enabled (minSdk 24), so the month/period uses Calendar instead.
+        val now = java.util.Calendar.getInstance()
+        val month = now.getDisplayName(
+            java.util.Calendar.MONTH,
+            java.util.Calendar.LONG,
+            java.util.Locale.getDefault()
+        )?.lowercase()
+            ?.replaceFirstChar { it.uppercase() }
+            ?: "Current"
         val updated = AtomicShelfAnalyticsEntity(
             id = "as_${author.id}",
             authorId = author.id,
             authorName = author.displayName,
             asClientId = clientId,
-            period = "Current Promo Campaign (${java.time.LocalDate.now().month.name.lowercase().replaceFirstChar { it.uppercase() }} 2026)",
+            period = "Current Promo Campaign ($month ${now.get(java.util.Calendar.YEAR)})",
             newsletterPlacements = 3,
             newsletterSubscribersReached = 52400,
             tiktokViews = 168400,

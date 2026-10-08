@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -266,10 +267,11 @@ fun CreateArcClubDialog(
 fun CreatePublicClubDialog(
     currentUser: UserEntity,
     onDismiss: () -> Unit,
-    onCreate: (name: String, genre: String, desc: String, bookTitle: String, bookAuthor: String, bookDesc: String) -> Unit
+    onCreate: (name: String, genre: String, desc: String, bookTitle: String, bookAuthor: String, bookDesc: String) -> Unit,
+    genreOptions: List<String> = listOf("Fantasy", "Sci-Fi", "Romance", "Mystery", "LitRPG", "Thriller", "Horror", "Non-Fiction", "YA", "Other")
 ) {
     var name by remember { mutableStateOf("") }
-    var genre by remember { mutableStateOf("Fantasy") }
+    var genre by remember { mutableStateOf(genreOptions.firstOrNull() ?: "Fantasy") }
     var description by remember { mutableStateOf("") }
     var bookTitle by remember { mutableStateOf("") }
     var bookAuthor by remember { mutableStateOf("") }
@@ -288,7 +290,7 @@ fun CreatePublicClubDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 420.dp)
+                    .heightIn(max = 440.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -300,12 +302,40 @@ fun CreatePublicClubDialog(
                     modifier = Modifier.fillMaxWidth().testTag("public_club_name_input")
                 )
 
-                OutlinedTextField(
-                    value = genre,
-                    onValueChange = { genre = it },
-                    label = { Text("Genre Tag *") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Genre is drawn from the same taxonomy the Discover clubs feed
+                // filters by, so a club created here is always reachable from
+                // its genre chip. Free-text genre tags silently orphaned clubs
+                // from genre navigation.
+                Column {
+                    Text(
+                        text = "Genre *",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(genreOptions) { option ->
+                            val isSelected = genre == option
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isSelected) ShelfmatesDeepBlue else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.clickable { genre = option }
+                            ) {
+                                Text(
+                                    text = option,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = description,

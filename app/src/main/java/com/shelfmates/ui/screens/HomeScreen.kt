@@ -125,6 +125,8 @@ fun HomeScreen(
     onSelectArcClub: (String) -> Unit,
     onJoinVoiceRoom: (PublicClubEntity) -> Unit,
     onNavigateDiscover: () -> Unit,
+    onDiscoverClubsByGenre: (String) -> Unit = { onNavigateDiscover() },
+    availableGenres: List<String> = emptyList(),
     onNavigateBookmarks: () -> Unit = {},
     onNavigateArcOpportunities: () -> Unit = {},
     onReadArc: (ArcClubEntity) -> Unit = {},
@@ -877,7 +879,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Button(
-                                onClick = onNavigateDiscover,
+                                onClick = { onDiscoverClubsByGenre("All") },
                                 colors = ButtonDefaults.buttonColors(containerColor = ShelfmatesDeepBlue)
                             ) {
                                 Text("Discover Clubs by Genre")
@@ -894,6 +896,57 @@ fun HomeScreen(
                                 club = club,
                                 onClick = { onSelectPublicClub(club.id) }
                             )
+                        }
+                    }
+                }
+
+                // Genre-centered club discovery: the same genre taxonomy used
+                // by the Discover clubs feed, surfaced here so the reader can
+                // jump from "my clubs" straight into "clubs like this".
+                if (availableGenres.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Browse Clubs by Genre",
+                            fontFamily = BookDisplayFont,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        TextButton(onClick = { onDiscoverClubsByGenre("All") }) {
+                            Text(
+                                text = "See All",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ShelfmatesDeepBlue
+                            )
+                        }
+                    }
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(availableGenres.filter { it != "All" }) { genre ->
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.clickable { onDiscoverClubsByGenre(genre) }
+                            ) {
+                                Text(
+                                    text = genre,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
                 }

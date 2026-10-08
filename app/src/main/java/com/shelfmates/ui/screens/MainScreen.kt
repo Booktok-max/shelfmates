@@ -397,6 +397,8 @@ fun MainScreen(viewModel: ShelfmatesViewModel) {
                                 onSelectArcClub = { viewModel.selectArcClub(it) },
                                 onJoinVoiceRoom = { club -> currentUser?.let { viewModel.joinVoiceRoom(club, it) } },
                                 onNavigateDiscover = { viewModel.setTab(MainTab.DISCOVER) },
+                                onDiscoverClubsByGenre = { genre -> viewModel.openDiscoverClubsByGenre(genre) },
+                                availableGenres = viewModel.availableGenres,
                                 onNavigateBookmarks = { viewModel.setTab(MainTab.BOOKMARKS_REWARDS) },
                                 onNavigateArcOpportunities = { viewModel.setTab(MainTab.ARC_OPPORTUNITIES) },
                                 onReadArc = { arc ->
@@ -606,6 +608,7 @@ fun MainScreen(viewModel: ShelfmatesViewModel) {
     if (uiState.isCreatePublicClubDialogOpen && currentUser != null) {
         CreatePublicClubDialog(
             currentUser = currentUser!!,
+            genreOptions = viewModel.availableGenres.filter { it != "All" },
             onDismiss = { viewModel.closeCreatePublicClubDialog() },
             onCreate = { name, genre, desc, title, author, bDesc ->
                 viewModel.createPublicClub(currentUser!!, name, genre, desc, title, author, bDesc)
