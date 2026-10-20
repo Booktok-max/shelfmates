@@ -1,0 +1,4 @@
+# Shelfmates web client
+# https://shelfmates.atomic-shelf.com
+User-agent: *
+Allow: /

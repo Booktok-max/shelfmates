@@ -37,12 +37,12 @@ export default function SignIn() {
     finally { setBusy(false) }
   }
 
-  if (loading) return <div className="sm-container sm-empty">Loading…</div>
+  if (loading) return <main className="sm-container sm-empty">Loading…</main>
 
   // Role selection step
   if (user && !role) {
     return (
-      <div className="sm-container" style={{ maxWidth: 520, paddingTop: 40 }}>
+      <main className="sm-container" style={{ maxWidth: 520, paddingTop: 40 }}>
         <h1 style={{ textAlign: 'center' }}>Choose your role</h1>
         <p style={{ textAlign: 'center', color: 'var(--sm-text-muted)' }}>This can only be set once.</p>
         <div style={{ display: 'grid', gap: 12, marginTop: 24 }}>
@@ -61,12 +61,12 @@ export default function SignIn() {
         <button className="sm-btn sm-btn-primary" style={{ width: '100%', marginTop: 20 }} disabled={!picked || busy} onClick={confirmRole}>
           {busy ? 'Saving…' : 'Continue'}
         </button>
-      </div>
+      </main>
     )
   }
 
   return (
-    <div className="sm-container" style={{ maxWidth: 440, paddingTop: 60 }}>
+    <main className="sm-container" style={{ maxWidth: 440, paddingTop: 60 }}>
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 48 }}>📚</div>
         <h1 style={{ margin: '8px 0 4px' }}>Atomic Shelfmates</h1>
@@ -84,6 +84,6 @@ export default function SignIn() {
       <p style={{ fontSize: 12, color: 'var(--sm-text-subtle)', textAlign: 'center', marginTop: 20 }}>
         By continuing you agree to the Shelfmates terms. Guest accounts are anonymous Firebase sessions.
       </p>
-    </div>
+    </main>
   )
 }

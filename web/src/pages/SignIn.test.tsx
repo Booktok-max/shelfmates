@@ -43,6 +43,17 @@ describe('SignIn', () => {
     expect(screen.getByRole('button', { name: /continue as guest/i })).toBeInTheDocument()
   })
 
+  it('renders the sign-in screen inside a main landmark', () => {
+    const { container } = renderSignIn()
+    expect(container.querySelector('main')).not.toBeNull()
+  })
+
+  it('renders the role picker inside a main landmark', () => {
+    mockAuth.user = { uid: 'u1', displayName: 'Ada' }
+    const { container } = renderSignIn()
+    expect(container.querySelector('main')).not.toBeNull()
+  })
+
   it('starts the Google sign-in flow', async () => {
     const user = userEvent.setup()
     renderSignIn()
