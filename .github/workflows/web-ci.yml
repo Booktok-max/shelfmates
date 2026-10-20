@@ -1,0 +1,77 @@
+name: Web CI
+
+# The web client lives in web/ and is completely independent of the Android
+# Gradle build. This workflow never touches app/, so the Android release
+# pipeline in .github/workflows/ci.yml is unaffected.
+#
+# It also never deploys. Deployment is a manual, reviewed step (see
+# web/README.md); this workflow only proves the web app builds, type-checks and
+# passes its tests.
+
+on:
+  push:
+    branches: [ main, feat/web-pwa ]
+    paths:
+      - 'web/**'
+      - 'firestore.rules'
+      - '.github/workflows/web-ci.yml'
+  pull_request:
+    branches: [ main, feat/web-pwa ]
+    paths:
+      - 'web/**'
+      - 'firestore.rules'
+      - '.github/workflows/web-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Build, type-check and test the web app
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # NOTE: no secrets are set here.
+      # web/.env.example is committed with placeholders; the real
+      # web/.env.local is gitignored and never reaches CI. The build must
+      # succeed without a Firebase config so that a missing local file can
+      # never break the pipeline.
+      - name: Type-check
+        run: npx tsc -b
+
+      - name: Run unit tests
+        run: npx vitest run
+
+      - name: Build
+        run: npx vite build
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          if-no-files-found: error
+          retention-days: 7

@@ -56,3 +56,6 @@ google-services.json
 # accident from a fresh clone. Untracked as of the design-system branch; set
 # your own id with `firebase use --add`.
 .firebaserc
+
+# The Firebase CLI's local build/deploy cache (hosting upload cache).
+.firebase/
