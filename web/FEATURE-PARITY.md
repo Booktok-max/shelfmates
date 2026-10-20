@@ -23,8 +23,8 @@ screen names.
 | 5 | Home shelves (Currently Reading / To Read / Finished) | Firestore `users/{uid}/bookshelf` | ✅ | `category` field on the shelf book document. |
 | 6 | Custom shelves | Firestore `users/{uid}/custom_shelves` | ✅ | Create / rename-less edit / delete, `shelf_{uid}_{name}` id convention. |
 | 7 | Saved books | Firestore `users/{uid}/bookshelf` | ✅ | Saved from a book detail page. Writes `saved_{uid}_{googleBooksId}`. |
-| 8 | Book discovery / search | External API: Google Books `volumes` | 🟡 | Direct browser call, same `googleapis.com/books/v1` endpoint the Android client uses. **Blocked upstream: the repo's `GOOGLE_BOOKS_KEY` expired** ("API key expired. Please renew the API key"), and the keyless fallback shares an exhausted per-IP daily quota. The client retries keyless when the key is rejected and surfaces a human-readable message; it needs a renewed, HTTP-referrer-restricted key to return results. The Android client uses the same expired key, so this is a pre-existing repo-wide defect, not a web regression. |
-| 9 | Book details | External API: Google Books `volumes/{id}` | 🟡 | Title, authors, categories, page count, rating, cover, description, ISBN-13. Same key/quota caveat as #8. |
+| 8 | Book discovery / search | External API: Google Books `volumes` | 🟡 | Direct browser call, same `googleapis.com/books/v1` endpoint the Android client uses. The expired key was replaced by a dedicated key restricted to `books.googleapis.com` and to the app's own HTTP referrers; it is sent in the `X-Goog-Api-Key` header so it never appears in a URL or a cache key, and the client still falls back to keyless if a key is rejected. Live search returns results, but **Google's Books backend is degraded provider-side**: `volumes?q=` returned `503 backendFailed` on 80–92% of requests during verification (see "Upstream risk" below). A bounded exponential-backoff retry is the only client-side mitigation available. |
+| 9 | Book details | External API: Google Books `volumes/{id}` | 🟡 | Title, authors, categories, page count, rating, cover, description, ISBN-13. Same degraded-upstream caveat as #8; single-volume lookups were observed to succeed more often than `?q=` searches. |
 | 10 | Save to shelf from a book page | Firestore | ✅ | Shelf selector on the detail page. |
 | 11 | Move a book between shelves / remove | Firestore | ✅ | Update and delete on the shelf document. |
 | 12 | Reading progress | Firestore `users/{uid}/reading_progress` | 🟡 | The web reader writes progress in the Android document shape. The *source* differs: the web reader opens a local EPUB/PDF file the user picks, because ARC manuscripts are not exposed by any shared public API today (see #20). |
@@ -45,7 +45,7 @@ screen names.
 | 27 | Author tools (CSV export, promo booking, Author Pro) | **Android Room only** / simulated | ❌ | No shared data path. |
 | 28 | Atomic Shelf analytics webhook | Simulated (seeded rows) | ❌ | No real webhook client exists. |
 | 29 | Notifications badge / "mark all read" | Android Room | ❌ | Same reason as #18. |
-| 30 | PWA install, offline shell, home-screen launch | — | ✅ | Service worker precaches the app shell only. No Firestore / Auth / API response is cached, so private data never lands in the Cache Storage. |
+| 30 | PWA install, offline shell, home-screen launch | — | ✅ | Service worker precaches the app shell only (21 entries). The one runtime cache holds public Google Books catalogue responses (`NetworkFirst`, 50 entries, 1 hour); its key is the plain request URL because the API key travels in a header, so no credential reaches the Cache Storage. Firestore and Firebase Auth responses are never cached, so private data never lands there. |
 
 ## What "shared" means precisely
 
@@ -84,10 +84,37 @@ backend for them, which is out of scope here.
 | Role choice persists and is not offered twice | Pass |
 | Create custom shelf → persisted to Firestore → survives reload → delete | Pass (real write/read/delete against production Firestore) |
 | Reading progress write from a local PDF | Pass (Firestore Write RPC 200; shape pinned by `Reader.test.tsx` and by the emulator rules tests) |
-| App shell precached, navigation fallback present | Pass (21 precache entries incl. `/index.html`) |
-| No Firestore / Auth / Google data in Cache Storage | Pass (cache audit found zero matches) |
-| Google Books search | **Blocked by an expired upstream API key** (see #8) |
-| Custom domain `shelfmates.atomic-shelf.com` | **Pending DNS** — see the deployment notes in `README.md` |
+| App shell precached, navigation fallback present | Pass (21 precache entries incl. `/index.html`; re-verified on a fresh install) |
+| No Firestore / Auth data in Cache Storage | Pass (cache audit found zero matches) |
+| No credential in any cache key | Pass (13/13 live Books requests carried the key in `X-Goog-Api-Key`; zero `?key=` in URLs or cache keys) |
+| Google Books search, keyed | Pass (live: 20 results of 325) — but see the upstream risk below |
+| Google Books rejected-key fallback | Pass (unit-tested; degrades to keyless and explains the failure) |
+| Custom domain `shelfmates.atomic-shelf.com` | **Blocked on DNS write access** — see the deployment notes in `README.md` |
+
+## Upstream risk: Google Books API degradation
+
+Google's `books/v1/volumes?q=` endpoint is currently unreliable for every
+caller, independent of project, key, and region. Measured from this machine
+against project `shelfmate-89898` with a valid, referrer-restricted key:
+
+| Sample | HTTP 200 |
+| --- | --- |
+| 12 sequential requests, ~1.2 s apart | 1 / 12 |
+| 15 requests, app's parameter set | 5 / 15 |
+| 15 requests, bare `q=` | 3 / 15 |
+| 8 requests, `X-Goog-Api-Key` + `Origin` | 1 / 8 |
+
+Failures are HTTP 503 `backendFailed` ("Service temporarily unavailable"), not
+quota or auth errors. Public reports describe the same behaviour since April
+2026 and a marked worsening in October 2026. Single-volume lookups
+(`volumes/{id}`) are materially more reliable than `?q=` searches.
+
+Mitigation shipped: up to 4 attempts per request with exponential backoff
+(400 / 900 / 1800 ms plus jitter), retrying only 5xx and network errors. 429 is
+*not* retried because it is a daily quota. The UI therefore either returns
+results or states plainly that Google Books is temporarily unavailable; it never
+shows stale or fabricated results. Replacing the provider is a product decision
+outside this change.
 
 ## Known defects found during verification (fixed)
 
@@ -103,3 +130,11 @@ backend for them, which is out of scope here.
 - **An expired Google Books key broke search outright** with a raw
   `Google Books error 400`. The client now degrades to the keyless quota and
   explains the failure instead of surfacing a status code.
+- **The API key was persisted in Cache Storage.** The Google Books runtime
+  cache keyed entries by the full request URL, including `?key=`, so a public
+  client credential was written to disk. The key is now sent in the
+  `X-Goog-Api-Key` header (allowed by Google's CORS preflight), leaving request
+  URLs and cache keys credential-free.
+- **Transient 503s surfaced as a raw status code.** `Google Books error 503`
+  was shown to users. Transient upstream failures are now retried with
+  exponential backoff and then reported as a temporary outage.

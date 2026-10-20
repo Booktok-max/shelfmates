@@ -42,7 +42,7 @@ npm run dev                    # http://localhost:5173
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | yes | `686595151953` |
 | `VITE_FIREBASE_APP_ID` | yes | The Web app id (`1:686595151953:web:…`) |
 | `VITE_FIREBASE_MEASUREMENT_ID` | no | Analytics id; omit to disable analytics. |
-| `VITE_GOOGLE_BOOKS_KEY` | no | Google Books API key. Unset ⇒ the app sends unauthenticated requests (lower quota), exactly like an Android build without a key. If a configured key is rejected (expired/revoked/referrer mismatch) the client automatically retries keyless rather than breaking search. **The key currently committed in the repo `.env` expired in October 2026** and must be renewed and restricted (HTTP referrers = the production hosts) before it is useful. |
+| `VITE_GOOGLE_BOOKS_KEY` | no | Google Books API key. Unset ⇒ the app sends unauthenticated requests (lower quota), exactly like an Android build without a key. If a configured key is rejected (expired/revoked/referrer mismatch) the client automatically retries keyless rather than breaking search. The web build uses a dedicated key restricted to the `books.googleapis.com` API and to the app's own HTTP referrers. It is sent in the `X-Goog-Api-Key` header, so it never appears in a request URL or a service-worker cache key. **The key in the repo `.env` is still the expired one** — that file feeds Android builds, so it was deliberately left untouched. |
 
 **No privileged secret is ever placed in this bundle.** There is no Admin SDK,
 no service-role key, and no database credential in the web app. The Gemini API
@@ -106,10 +106,20 @@ Gradle.
   Vite's content-hashed output. A broader `**/*.js` glob would also match the
   unhashed `sw.js` and `registerSW.js` and freeze them for a year.
 - The service worker precaches the **app shell only** (JS/CSS/HTML/icons).
-  Firestore, Firebase Auth and Google Books responses are never written to the
-  Cache Storage, so a signed-out shared device cannot expose another user's
-  data through the offline cache. The only runtime cache entry is the
-  public Google Books search API (`NetworkFirst`, 50 entries, 1 hour).
+  Firestore and Firebase Auth responses are never written to the Cache Storage,
+  so a signed-out shared device cannot expose another user's data through the
+  offline cache. The only runtime cache holds **public** Google Books catalogue
+  responses (`NetworkFirst`, 50 entries, 1 hour).
+- **The Google Books key is sent as `X-Goog-Api-Key`, not `?key=`.** Google
+  allows that header in its CORS preflight response. Keeping it out of the URL
+  means it cannot leak into browser history, referrer headers, access logs, or
+  a service-worker cache key, and the runtime cache is keyed by the plain URL.
+- **Google Books is retried, not trusted.** The upstream `volumes?q=` endpoint
+  is currently degraded provider-side (80–92% HTTP 503 `backendFailed` during
+  verification). Requests get up to four attempts with exponential backoff and
+  jitter; only 5xx and network errors are retried (a 429 is a daily quota). If
+  every attempt fails the UI says the service is temporarily unavailable — it
+  never falls back to stale or invented results.
 
 ### Custom domain
 
@@ -146,8 +156,15 @@ empirically against a preview-channel hostname that was never added to the
 OAuth client's JavaScript origins and which still reached Google's sign-in
 normally.
 
-The domain also has to be listed in Firebase Authentication's authorised
-domains, otherwise Google sign-in refuses to complete the redirect.
+**Status: blocked on DNS write access.** The Firebase custom domain exists but
+reports `ownershipState: OWNERSHIP_MISSING`, `hostState: HOST_UNHOSTED` and a
+temporary certificate that never finishes validating, because neither record
+exists in public DNS. The deployment credentials available in this environment
+hold Cloudflare `zone:read` only; the DNS API returns HTTP 403 for both listing
+and creating records, so the change cannot be applied here. Adding the two
+records above in the Cloudflare dashboard (or with a token carrying
+`Zone:DNS:Edit` for `atomic-shelf.com`) unblocks Firebase's automatic ownership
+check and certificate issuance — no further Firebase-side action is needed.
 
 ## What is intentionally not on the web
 

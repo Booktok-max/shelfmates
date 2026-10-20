@@ -32,6 +32,9 @@ export default defineConfig({
           {
             urlPattern: /^https:\/\/www\.googleapis\.com\/books\/v1\//,
             handler: 'NetworkFirst',
+            // Only public catalogue metadata is cached. The API key travels in
+            // the `X-Goog-Api-Key` header, never in the URL, so no credential
+            // can end up in the cache key or the Cache Storage payload.
             options: { cacheName: 'google-books', expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 } },
           },
         ],
