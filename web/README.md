@@ -100,11 +100,17 @@ Gradle.
   declared for `/` as well as `/index.html`; a rule for `/index.html` alone
   leaves the site root with Firebase's default `max-age=3600`, which serves an
   hour-old shell that points at asset hashes the new release has already
-  deleted. `**/*.html`, `/sw.js` and `/registerSW.js` are `no-cache` for the
-  same reason.
+  deleted. `**/*.html` and `/sw.js` are `no-cache` for the same reason.
 - The `immutable` one-year rule is scoped to `**/assets/**`, which only contains
   Vite's content-hashed output. A broader `**/*.js` glob would also match the
-  unhashed `sw.js` and `registerSW.js` and freeze them for a year.
+  unhashed `sw.js` and freeze it for a year.
+- **Registration lives in `src/pwa.ts`, not the plugin's injected shim.** A
+  deploy deletes the previous release's hashed chunks, and the SPA rewrite
+  answers a missing `/assets/*.js` with `index.html`, so a tab left on the old
+  shell would fail its next lazy route load once the new worker claimed it. The
+  registration reloads once on `controllerchange` when an existing page is taken
+  over (first-time visitors are not reloaded) and re-checks for updates when the
+  tab becomes visible again.
 - The service worker precaches the **app shell only** (JS/CSS/HTML/icons).
   Firestore and Firebase Auth responses are never written to the Cache Storage,
   so a signed-out shared device cannot expose another user's data through the

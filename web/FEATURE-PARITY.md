@@ -118,15 +118,21 @@ outside this change.
 
 ## Known defects found during verification (fixed)
 
-- **Stale PWA shell after deploys.** `firebase.json` set `no-cache` on
-  `/index.html` but Firebase matches header sources against the *request* path,
-  so navigation to `/` still got `Cache-Control: max-age=3600` and could serve
-  an hour-old shell pointing at deleted asset hashes. Fixed by adding explicit
-  `/`, `**/*.html`, `/sw.js` and `/registerSW.js` no-cache rules.
-- **Unhashed `registerSW.js` was cached for a year.** The old rule
-  `**/*.@(js|css)` matched it and marked it `immutable`, which would pin the
-  service-worker registration shim. The immutable rule is now scoped to
-  `**/assets/**`, which only ever contains Vite's content-hashed output.
+- **Stale PWA shell after deploys.** Two causes. First, `firebase.json` set
+  `no-cache` on `/index.html` but Firebase matches header sources against the
+  *request* path, so navigation to `/` still got `Cache-Control: max-age=3600`
+  and could serve an hour-old shell pointing at deleted asset hashes; explicit
+  `/`, `**/*.html` and `/sw.js` no-cache rules fixed that. Second, the injected
+  registration shim only called `register()`, so a tab that stayed open across a
+  deploy kept the old document after the new worker took control and its next
+  lazy chunk request hit the SPA rewrite (HTML instead of JavaScript).
+  Registration now lives in `src/pwa.ts` and reloads once on
+  `controllerchange`; first-time visitors are not reloaded, and a long-lived tab
+  re-checks for updates when it is foregrounded.
+- **The registration shim is no longer generated.** `injectRegister` is off and
+  `web/src/pwa.ts` owns registration, so there is no unhashed `registerSW.js` for
+  the one-year `immutable` rule to pin. That rule remains scoped to
+  `**/assets/**`.
 - **An expired Google Books key broke search outright** with a raw
   `Google Books error 400`. The client now degrades to the keyless quota and
   explains the failure instead of surfacing a status code.

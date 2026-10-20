@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registration lives in src/pwa.ts so an updated worker reloads the page
+      // instead of leaving the tab on a shell whose chunks no longer exist.
+      injectRegister: null,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Shelfmates',
