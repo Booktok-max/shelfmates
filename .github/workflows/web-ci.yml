@@ -9,14 +9,15 @@ name: Web CI
 # passes its tests.
 
 on:
+  # Run on any branch that changes the browser app, including integration
+  # and short-lived fix branches.
   push:
-    branches: [ main, feat/web-pwa ]
     paths:
       - 'web/**'
       - 'firestore.rules'
       - '.github/workflows/web-ci.yml'
   pull_request:
-    branches: [ main, feat/web-pwa ]
+    branches: [ main, feat/web-pwa, feat/shelf-design-system ]
     paths:
       - 'web/**'
       - 'firestore.rules'

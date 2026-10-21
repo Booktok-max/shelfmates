@@ -33,7 +33,7 @@ export default function Discover() {
     run(q)
   }
 
-  const chips = ['NYT Bestsellers', 'Trending', 'Sci-Fi', 'Fantasy', 'Mystery', 'Romance', 'Award Winners', 'Non-Fiction']
+  const chips = ['Sci-Fi', 'Fantasy', 'Mystery', 'Romance', 'Non-Fiction', 'Biography', 'History', 'Poetry', "Children's"]
 
   return (
     <div className="sm-container">
