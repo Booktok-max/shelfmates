@@ -30,7 +30,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/],
+        // Firebase Auth reserves the /__/ namespace (e.g. /__/auth/handler).
+        // If the SPA fallback catches it, the service worker returns index.html
+        // and Google sign-in popups fail with a client-side 404.
+        navigateFallbackDenylist: [/^\/api/, /^\/__/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/www\.googleapis\.com\/books\/v1\//,
