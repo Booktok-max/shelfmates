@@ -28,6 +28,7 @@ import com.shelfmates.data.local.ArcClubEntity
 import com.shelfmates.data.local.PublicClubEntity
 import com.shelfmates.data.local.UserEntity
 import com.shelfmates.data.model.UserRole
+import com.shelfmates.ui.theme.ShelfTitleStyle
 import com.shelfmates.ui.theme.ShelfmatesDeepBlue
 import com.shelfmates.ui.theme.ShelfmatesGold
 import com.shelfmates.ui.viewmodel.MyClubsTab
@@ -73,6 +74,16 @@ fun MyClubsScreen(
                 .padding(padding)
                 .testTag("my_clubs_screen")
         ) {
+            // Screen title. Clubs are the book-adjacent community surface, so
+            // this says what it is rather than leaving a bare crimson tab bar.
+            Text(
+                text = "Clubs",
+                style = ShelfTitleStyle,
+                modifier = Modifier
+                    .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 2.dp)
+                    .testTag("clubs_title")
+            )
+
             // Tabs
             TabRow(
                 selectedTabIndex = when (myClubsTab) {

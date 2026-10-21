@@ -3,6 +3,7 @@ package com.shelfmates.ui.components
 import android.content.Intent
 import android.net.Uri
 import com.shelfmates.data.local.BookShelfCategory
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,6 +71,7 @@ import coil.compose.AsyncImage
 import com.shelfmates.data.model.GoogleBookVolumeItem
 import com.shelfmates.ui.theme.ShelfmatesAmber
 import com.shelfmates.ui.theme.ShelfmatesCoral
+import com.shelfmates.ui.theme.ShelfAccentGold
 import com.shelfmates.ui.theme.ShelfmatesDeepBlue
 import com.shelfmates.ui.theme.ShelfmatesEmerald
 import com.shelfmates.ui.theme.ShelfmatesGold
@@ -443,48 +445,59 @@ fun GoogleBookDetailView(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Three Category Selection Buttons Row
+                // ONE primary action, chosen by the book's current state.
+                // Previously three equal-weight filled buttons (Reading / To
+                // Read / Finished) sat side by side, so nothing on the screen
+                // read as "the next thing to do". The full shelf choice is
+                // still here -- it just moved below the primary action as a
+                // quiet secondary row.
+                Spacer(modifier = Modifier.height(12.dp))
+
+                ShelfPrimaryAction(
+                    label = when {
+                        currentShelfCategory == BookShelfCategory.CURRENTLY_READING -> "Continue Reading"
+                        currentShelfCategory != null -> "Saved to $currentShelfCategory"
+                        else -> "Add to To Read"
+                    },
+                    onClick = {
+                        onSaveToShelf?.invoke(
+                            currentShelfCategory ?: BookShelfCategory.TO_READ
+                        )
+                    },
+                    modifier = Modifier.testTag("btn_save_shelf_primary")
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val categories: List<Triple<String, String, String>> = listOf(
-                        Triple(BookShelfCategory.CURRENTLY_READING, "📖 Reading", "currently_reading"),
-                        Triple(BookShelfCategory.TO_READ, "🔖 To Read", "to_read"),
-                        Triple(BookShelfCategory.FINISHED, "✅ Finished", "finished")
-                    )
-
-                    categories.forEach { (catKey, catLabel, testId) ->
-                        val isSelected = currentShelfCategory == catKey || (catKey == BookShelfCategory.TO_READ && currentShelfCategory == BookShelfCategory.WANT_TO_READ)
-                        Button(
+                    listOf(
+                        BookShelfCategory.CURRENTLY_READING to ("currently_reading" to "Reading"),
+                        BookShelfCategory.TO_READ to ("to_read" to "To Read"),
+                        BookShelfCategory.FINISHED to ("finished" to "Finished")
+                    ).forEach { (catKey, meta) ->
+                        val (testId, catLabel) = meta
+                        val isSelected = currentShelfCategory == catKey
+                        OutlinedButton(
                             onClick = { onSaveToShelf?.invoke(catKey) },
                             shape = RoundedCornerShape(10.dp),
-                            colors = if (isSelected) {
-                                ButtonDefaults.buttonColors(
-                                    containerColor = when (catKey) {
-                                        BookShelfCategory.CURRENTLY_READING -> ShelfmatesDeepBlue
-                                        BookShelfCategory.TO_READ, BookShelfCategory.WANT_TO_READ -> ShelfmatesAmber
-                                        BookShelfCategory.FINISHED -> ShelfmatesEmerald
-                                        else -> ShelfmatesNavy
-                                    },
-                                    contentColor = Color.White
-                                )
-                            } else {
-                                ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                    contentColor = MaterialTheme.colorScheme.onSurface
-                                )
-                            },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = if (isSelected) ShelfAccentGold
+                                               else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            border = if (isSelected) BorderStroke(1.5.dp, ShelfAccentGold) else null,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(38.dp)
+                                .height(36.dp)
                                 .testTag("btn_save_shelf_$testId"),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp)
                         ) {
                             Text(
                                 text = catLabel,
                                 fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )

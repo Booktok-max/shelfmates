@@ -3,7 +3,6 @@ package com.shelfmates.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,7 +56,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -127,6 +125,8 @@ fun HomeScreen(
     onSelectArcClub: (String) -> Unit,
     onJoinVoiceRoom: (PublicClubEntity) -> Unit,
     onNavigateDiscover: () -> Unit,
+    onDiscoverClubsByGenre: (String) -> Unit = { onNavigateDiscover() },
+    availableGenres: List<String> = emptyList(),
     onNavigateBookmarks: () -> Unit = {},
     onNavigateArcOpportunities: () -> Unit = {},
     onReadArc: (ArcClubEntity) -> Unit = {},
@@ -143,88 +143,66 @@ fun HomeScreen(
             .testTag("home_feed_list"),
         contentPadding = PaddingValues(bottom = 90.dp)
     ) {
-        // Hero Header Banner with Book Aesthetic Velvet Crimson Gradient
+        // Identity header. Answers "what am I and where are my books?" and
+        // nothing else. The previous 205dp hero with a streak badge and a
+        // "LITERARY GUILD" label was the loudest thing on the screen and
+        // described a gamification tier rather than the product.
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(205.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.img_hero_bookclub),
-                    contentDescription = "Shelfmates Community",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+            ShelfHomeHeader(
+                displayName = currentUser?.displayName,
+                currentlyReadingCount = savedBooks.count { it.category == "Currently Reading" },
+                savedCount = savedBooks.size,
+                modifier = Modifier.testTag("home_header")
+            )
+        }
+
+        // First run: state the next action instead of showing an empty table.
+        if (savedBooks.isEmpty()) {
+            item {
+                ShelfFirstRunNote(
+                    onFindBooks = {
+                        onGoogleBooksSearchChange("bestsellers")
+                        onPerformGoogleBooksSearch("bestsellers")
+                    },
+                    modifier = Modifier.testTag("home_first_run_note")
                 )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    ShelfmatesInkBlack.copy(alpha = 0.65f),
-                                    ShelfmatesDeepBlue.copy(alpha = 0.95f)
-                                )
-                            )
-                        )
-                )
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 20.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(ShelfmatesGold)
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "LITERARY GUILD",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color.Black,
-                                letterSpacing = 0.8.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color.Black.copy(alpha = 0.4f))
-                                .padding(horizontal = 7.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "🔥 14-DAY STREAK",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Welcome back, ${currentUser?.displayName ?: "Reader"}!",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontFamily = BookDisplayFont,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Connect with authors, join live audio read-alongs, and read launch ARCs.",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = BookDisplayFont
-                        ),
-                        color = Color.White.copy(alpha = 0.92f),
-                        fontSize = 12.sp
-                    )
-                }
             }
         }
+
+        // Level 1 -> Level 2: the reader's own books come before anything
+        // the app wants to show them.
+        // Room Database Bookshelf Section: Categories ('Currently Reading', 'To Read', 'Finished' + Custom Shelves)
+        item {
+            Spacer(modifier = Modifier.height(6.dp))
+            BookshelfCategorySection(
+                savedBooks = savedBooks,
+                customShelves = customShelves,
+                cloudSyncState = cloudSyncState,
+                selectedCategoryFilter = selectedShelfCategoryFilter,
+                onCategoryFilterChange = onShelfCategoryFilterChange,
+                onUpdateCategory = onUpdateSavedBookCategory,
+                onUpdateNotes = onUpdateSavedBookNotes,
+                onRemoveBook = onRemoveSavedBook,
+                onSyncWithCloud = onSyncWithCloud,
+                onCreateCustomShelf = onCreateCustomShelf,
+                onDeleteCustomShelf = onDeleteCustomShelf,
+                onNavigateToSearch = {
+                    onGoogleBooksSearchChange("bestsellers")
+                    onPerformGoogleBooksSearch("bestsellers")
+                },
+                onSelectBookGoogleId = { gId ->
+                    val matchedBook = googleBooksResults.firstOrNull { it.id == gId }
+                    if (matchedBook != null) {
+                        onSelectGoogleBook(matchedBook)
+                    } else {
+                        onPerformGoogleBooksSearch(gId)
+                    }
+                }
+            )
+        }
+
+        // DISCOVER. Two routes only (bestsellers + search). The previous
+        // ordering put this above the user's own shelf.
 
         // The New York Times Best Sellers - Rotating Showcase on Front Page
         item {
@@ -527,36 +505,6 @@ fun HomeScreen(
                     )
                 }
             }
-        }
-
-        // Room Database Bookshelf Section: Categories ('Currently Reading', 'To Read', 'Finished' + Custom Shelves)
-        item {
-            Spacer(modifier = Modifier.height(6.dp))
-            BookshelfCategorySection(
-                savedBooks = savedBooks,
-                customShelves = customShelves,
-                cloudSyncState = cloudSyncState,
-                selectedCategoryFilter = selectedShelfCategoryFilter,
-                onCategoryFilterChange = onShelfCategoryFilterChange,
-                onUpdateCategory = onUpdateSavedBookCategory,
-                onUpdateNotes = onUpdateSavedBookNotes,
-                onRemoveBook = onRemoveSavedBook,
-                onSyncWithCloud = onSyncWithCloud,
-                onCreateCustomShelf = onCreateCustomShelf,
-                onDeleteCustomShelf = onDeleteCustomShelf,
-                onNavigateToSearch = {
-                    onGoogleBooksSearchChange("bestsellers")
-                    onPerformGoogleBooksSearch("bestsellers")
-                },
-                onSelectBookGoogleId = { gId ->
-                    val matchedBook = googleBooksResults.firstOrNull { it.id == gId }
-                    if (matchedBook != null) {
-                        onSelectGoogleBook(matchedBook)
-                    } else {
-                        onPerformGoogleBooksSearch(gId)
-                    }
-                }
-            )
         }
 
         // Gamified Bookmarks & Quest Shortcut Card
@@ -931,7 +879,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Button(
-                                onClick = onNavigateDiscover,
+                                onClick = { onDiscoverClubsByGenre("All") },
                                 colors = ButtonDefaults.buttonColors(containerColor = ShelfmatesDeepBlue)
                             ) {
                                 Text("Discover Clubs by Genre")
@@ -948,6 +896,57 @@ fun HomeScreen(
                                 club = club,
                                 onClick = { onSelectPublicClub(club.id) }
                             )
+                        }
+                    }
+                }
+
+                // Genre-centered club discovery: the same genre taxonomy used
+                // by the Discover clubs feed, surfaced here so the reader can
+                // jump from "my clubs" straight into "clubs like this".
+                if (availableGenres.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Browse Clubs by Genre",
+                            fontFamily = BookDisplayFont,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        TextButton(onClick = { onDiscoverClubsByGenre("All") }) {
+                            Text(
+                                text = "See All",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ShelfmatesDeepBlue
+                            )
+                        }
+                    }
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(availableGenres.filter { it != "All" }) { genre ->
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.clickable { onDiscoverClubsByGenre(genre) }
+                            ) {
+                                Text(
+                                    text = genre,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
                 }

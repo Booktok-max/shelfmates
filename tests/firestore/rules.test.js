@@ -236,6 +236,7 @@ describe("users/{uid} subcollections", () => {
     ["book_logs", "log_1"],
     ["bookshelf", "gbook_1"],
     ["custom_shelves", "shelf_1"],
+    ["club_memberships", "club_1"],
   ];
 
   for (const [name, docId] of subcollections) {
@@ -375,6 +376,92 @@ describe("users/{uid} subcollections", () => {
       });
     });
   }
+});
+
+describe("club membership (users/{uid}/club_memberships/{clubId})", () => {
+  // Mirrors syncClubMembershipToFirestore(): join writes / leave deletes the
+  // membership doc under the reader's own subtree. Rules must make membership
+  // owner-only so the join button is a convenience, not the authorization.
+
+  it("allows joining a club (write membership with matching userId)", async () => {
+    await assertSucceeds(
+      client(ALICE)
+        .collection("users")
+        .doc(ALICE)
+        .collection("club_memberships")
+        .doc("club_1")
+        .set({ userId: ALICE, clubId: "club_1", joinedAt: 1 }, { merge: true })
+    );
+  });
+
+  it("allows leaving a club (delete own membership)", async () => {
+    await asAdmin((db) => db
+      .collection("users")
+      .doc(ALICE)
+      .collection("club_memberships")
+      .doc("club_1")
+      .set({ userId: ALICE, clubId: "club_1" }));
+    await assertSucceeds(
+      client(ALICE)
+        .collection("users")
+        .doc(ALICE)
+        .collection("club_memberships")
+        .doc("club_1")
+        .delete()
+    );
+  });
+
+  it("refuses enrolling another user in a club", async () => {
+    // There must be no path by which Alice can record a membership for
+    // Mallory — or itself be enrolled by someone else.
+    await assertFails(
+      client(ALICE)
+        .collection("users")
+        .doc(MALLORY)
+        .collection("club_memberships")
+        .doc("club_1")
+        .set({ userId: MALLORY, clubId: "club_1" }, { merge: true })
+    );
+  });
+
+  it("refuses a membership whose userId points at another account", async () => {
+    await assertFails(
+      client(ALICE)
+        .collection("users")
+        .doc(ALICE)
+        .collection("club_memberships")
+        .doc("club_1")
+        .set({ userId: MALLORY, clubId: "club_1" }, { merge: true })
+    );
+  });
+
+  it("refuses reading another user's memberships", async () => {
+    await asAdmin((db) => db
+      .collection("users")
+      .doc(ALICE)
+      .collection("club_memberships")
+      .doc("club_1")
+      .set({ userId: ALICE, clubId: "club_1" }));
+    await assertFails(
+      client(MALLORY)
+        .collection("users")
+        .doc(ALICE)
+        .collection("club_memberships")
+        .doc("club_1")
+        .get()
+    );
+  });
+
+  it("refuses a signed-out membership write", async () => {
+    await assertFails(
+      anon()
+        .collection("users")
+        .doc(ALICE)
+        .collection("club_memberships")
+        .doc("club_1")
+        .set({ userId: ALICE, clubId: "club_1" })
+    );
+  });
 });
 
 describe("users/{uid} — profile ownership field", () => {

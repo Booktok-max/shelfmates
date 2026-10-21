@@ -335,6 +335,46 @@ class FirebaseService private constructor() {
     }
 
     /**
+     * Persist or remove the user's membership in a public book club.
+     *
+     * Membership is stored under the reader's own subtree
+     * (`users/{userId}/club_memberships/{clubId}`), so the security rules can
+     * enforce that a reader may only write their own membership — the UI can
+     * offer join/leave buttons, but the server is the source of truth.
+     *
+     * Joining creates the document (union write merges an idempotent re-join);
+     * leaving deletes it so an empty membership set is the absence of rows,
+     * matching the local Room `isJoined` flag's semantics.
+     */
+    suspend fun syncClubMembershipToFirestore(
+        userId: String,
+        clubId: String,
+        joined: Boolean
+    ) = withContext(Dispatchers.IO) {
+        if (firestore == null) return@withContext
+        try {
+            val membershipRef = firestore?.collection("users")?.document(userId)
+                ?.collection("club_memberships")?.document(clubId)
+            if (joined) {
+                membershipRef?.set(
+                    hashMapOf(
+                        "userId" to userId,
+                        "clubId" to clubId,
+                        "joinedAt" to System.currentTimeMillis()
+                    ),
+                    SetOptions.merge()
+                )?.await()
+                Log.d(TAG, "Club membership synced to Firestore: $userId -> $clubId")
+            } else {
+                membershipRef?.delete()?.await()
+                Log.d(TAG, "Club membership removed from Firestore: $userId -> $clubId")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync club membership to Firestore: ${e.message}")
+        }
+    }
+
+    /**
      * Fetch the user's saved role from Firestore, if any
      */
     suspend fun getUserRole(userId: String): String? = withContext(Dispatchers.IO) {

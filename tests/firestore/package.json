@@ -5,7 +5,7 @@
   "description": "Emulator tests for shelfmates firestore.rules",
   "scripts": {
     "pretest": "node stage-rules.js",
-    "test": "firebase emulators:exec --only firestore --project demo-shelfmates \"mocha --exit rules.test.js\""
+    "test": "firebase emulators:exec --only firestore --project demo-shelfmates \"mocha --exit rules.test.js web-rules.test.js\""
   },
   "dependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

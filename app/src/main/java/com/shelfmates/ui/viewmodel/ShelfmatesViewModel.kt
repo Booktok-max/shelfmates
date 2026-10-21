@@ -1,11 +1,9 @@
 package com.shelfmates.ui.viewmodel
 
 import android.app.Application
-import android.util.Log
 
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.shelfmates.BuildConfig
 import com.shelfmates.data.local.AppDatabase
 import com.shelfmates.data.local.ArcApplicationEntity
 import com.shelfmates.data.local.ArcClubEntity
@@ -276,6 +274,24 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.value = _uiState.value.copy(selectedGenre = genre)
     }
 
+    /**
+     * Opens the Discover tab on the Public Clubs feed, pre-filtered to [genre].
+     *
+     * Genre navigation from Home ("Browse clubs by genre") and from the
+     * Google Books catalog goes through here so the genre chip state and the
+     * discover tab always agree with the entry point the user tapped.
+     */
+    fun openDiscoverClubsByGenre(genre: String) {
+        _uiState.value = _uiState.value.copy(
+            currentTab = MainTab.DISCOVER,
+            discoverTab = DiscoverTab.PUBLIC_CLUBS,
+            selectedGenre = genre,
+            searchQuery = "",
+            selectedPublicClubId = null,
+            selectedArcClubId = null
+        )
+    }
+
     fun setSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
     }
@@ -290,38 +306,6 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
 
     fun selectThread(threadId: String?) {
         _uiState.value = _uiState.value.copy(selectedThreadId = threadId)
-    }
-
-    /**
-     * Debug-only persona switcher: re-points the local database at one of the
-     * demo users from SeedData so screens can be exercised without signing in
-     * as several accounts.
-     *
-     * Refused in release builds. It assigns
-     * [ShelfmatesRepository.currentUserId] from an arbitrary string, which would
-     * let anyone with a release build read another account's local rows. It also
-     * has no meaning in release: the demo database is only seeded in debug (see
-     * app/src/release/.../SeedData.kt), so there are no personas to switch to.
-     */
-    fun switchUserPersona(userId: String) {
-        if (!BuildConfig.DEBUG) {
-            Log.w(TAG_PERSONA, "Refused persona switch in a release build")
-            return
-        }
-
-        viewModelScope.launch {
-            repository.switchActiveUser(userId)
-            val name = when(userId) {
-                "user_ray" -> "Ray K. Vance (Author & Reader)"
-                "user_priya" -> "Priya Sharma (ARC Reviewer)"
-                "user_jamie" -> "Jamie Miller (Book Club Reader)"
-                "user_elena" -> "Elena Vance (Sci-Fi Author)"
-                else -> "User"
-            }
-            _uiState.value = _uiState.value.copy(
-                userFeedbackMessage = "Switched active persona to $name"
-            )
-        }
     }
 
     fun getPublicClubDetail(clubId: String) = repository.getPublicClubById(clubId)
@@ -367,16 +351,35 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /**
+     * Hydrates [userRole] from Firestore for a RETURNING reader.
+     *
+     * This must never clear a role the reader chose in the current session.
+     *
+     * For a brand-new guest there is no `users/{uid}` role document yet, so this
+     * read returns nothing and used to assign `_userRole.value = null`. Because
+     * it runs from `LaunchedEffect(isSignedIn)`, a slow Firestore round-trip
+     * could land AFTER the reader tapped a role on the picker and overwrite it,
+     * bouncing them straight back to role selection -- the same dead end that
+     * made the guest route unusable before it was wired up.
+     *
+     * So: only hydrate when nothing has been chosen yet. A role set in this
+     * session is authoritative over a read that predates it.
+     */
     fun loadUserRole() {
+        if (_userRole.value != null) return
         viewModelScope.launch {
             firebaseService.getCurrentFirebaseUser()?.uid?.let { uid ->
-                val roleName = firebaseService.getUserRole(uid)
-                _userRole.value = roleName?.let {
-                    try {
-                        UserRole.valueOf(it)
-                    } catch (e: IllegalArgumentException) {
-                        null
-                    }
+                val roleName = firebaseService.getUserRole(uid) ?: return@let
+                val role = try {
+                    UserRole.valueOf(roleName)
+                } catch (e: IllegalArgumentException) {
+                    null
+                }
+                // Re-check: the reader may have chosen a role while this read was
+                // in flight, and that choice wins.
+                if (role != null && _userRole.value == null) {
+                    _userRole.value = role
                 }
             }
         }
@@ -897,7 +900,7 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
                 // Point the local Room queries at this account now that it exists.
                 user?.let { repository.setActiveUser(it.uid) }
                 _uiState.value = _uiState.value.copy(
-                    userFeedbackMessage = "Welcome ${user?.displayName ?: "Reader"}! Synced with Firebase Auth."
+                    userFeedbackMessage = "Welcome ${user?.displayName ?: "Reader"}!"
                 )
             }.onFailure { err ->
                 _authErrorMessage.value = err.message ?: "Google Sign-In failed."
@@ -926,11 +929,11 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
                     // as a finished sign-in would strand the user on the gate
                     // with no explanation.
                     _authErrorMessage.value =
-                        "Could not start a guest session. Firebase Authentication is not configured for this build."
+                        "Could not start a guest session. Sign-in is not available right now."
                 } else {
                     repository.setActiveUser(user.uid)
                     _uiState.value = _uiState.value.copy(
-                        userFeedbackMessage = "Signed in as Guest with Firebase Firestore persistence."
+                        userFeedbackMessage = "Signed in as guest. Your shelf will sync when you sign in."
                     )
                 }
             }.onFailure { err ->
@@ -949,7 +952,7 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
         repository.setActiveUser(SIGNED_OUT_USER_ID)
         _userRole.value = null
         _uiState.value = _uiState.value.copy(
-            userFeedbackMessage = "Signed out of Firebase."
+            userFeedbackMessage = "Signed out."
         )
     }
 
@@ -1357,7 +1360,7 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
             val result = repository.syncWithFirestoreCloud()
             if (result.isSuccess) {
                 _uiState.value = _uiState.value.copy(
-                    userFeedbackMessage = "Bookshelf successfully synced with Cloud Firestore!"
+                    userFeedbackMessage = "Your shelf is backed up and synced."
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
@@ -1439,8 +1442,6 @@ class ShelfmatesViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private companion object {
-        const val TAG_PERSONA = "ShelfmatesViewModel"
-
         /**
          * Local-database key used while nobody is signed in. Matches no seeded
          * row, so the UI falls back to empty states instead of demo content.

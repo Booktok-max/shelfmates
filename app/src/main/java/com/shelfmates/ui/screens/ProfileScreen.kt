@@ -77,7 +77,6 @@ fun ProfileScreen(
     onSignInWithGoogle: () -> Unit = {},
     onSignInAnonymously: () -> Unit = {},
     onSignOut: () -> Unit = {},
-    onSwitchUser: (String) -> Unit,
     onNavigateToBookmarks: () -> Unit = {},
     onNavigateToArcOpportunities: () -> Unit = {},
     onOpenCreateArcDialog: () -> Unit = {},
@@ -402,68 +401,13 @@ fun ProfileScreen(
             }
         }
 
-        // Demo Persona Switcher Card
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(12.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.SwapHoriz, contentDescription = null, tint = ShelfmatesDeepBlue)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Interactive Persona Switcher",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Test the app across different author & reader user roles:",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        val personas = listOf(
-                            "user_chloe" to "Chloe (PRD Author)",
-                            "user_sarah" to "Sarah (PRD Reader)",
-                            "user_ray" to "Ray (Indie Author)",
-                            "user_priya" to "Priya (ARC Reader)",
-                            "user_jamie" to "Jamie (Casual)",
-                            "user_elena" to "Elena (Pro VIP)"
-                        )
-                        items(personas) { (userId, label) ->
-                            val isSelected = currentUser?.id == userId
-                            Surface(
-                                onClick = { onSwitchUser(userId) },
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isSelected) ShelfmatesDeepBlue else MaterialTheme.colorScheme.surfaceVariant,
-                                border = if (isSelected) BorderStroke(1.dp, ShelfmatesGold) else null,
-                                modifier = Modifier.testTag("switch_persona_$userId")
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // The demo persona switcher used to live here, gated only by
+        // BuildConfig.DEBUG. That is not sufficient: every debug build shipped
+        // it, so "switch to Priya" became reachable product UX and the reader's
+        // identity could change mid-session with no account involved. There is
+        // one current user. Community people remain visible as club owners,
+        // reviewers and thread participants -- they are other people, not
+        // alternative selves.
 
         // FIREBASE AUTH & CLOUD FIRESTORE STATUS
         item {
@@ -490,7 +434,7 @@ fun ProfileScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Firebase Cloud Integration",
+                                text = "Cloud Sync",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 color = ShelfmatesDeepBlue
@@ -513,7 +457,7 @@ fun ProfileScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = authState?.syncStatusMessage ?: "Reading progress & book logs synced with Firebase Firestore.",
+                        text = authState?.syncStatusMessage ?: "Reading progress and book logs are synced to your account.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
