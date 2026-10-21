@@ -58,4 +58,15 @@ describe('Discover', () => {
     await user.click(screen.getByRole('button', { name: 'Search' }))
     await waitFor(() => expect(screen.getByText(/no results/i)).toBeInTheDocument())
   })
+
+  it('offers subject topics instead of unsupported bestseller, trending, and award feeds', () => {
+    renderDiscover()
+
+    expect(screen.getByRole('button', { name: 'Romance' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sci-Fi' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'NYT Bestsellers' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Trending' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Award Winners' })).not.toBeInTheDocument()
+  })
+
 })

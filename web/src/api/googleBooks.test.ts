@@ -203,6 +203,57 @@ describe('searchVolumes transient failure handling', () => {
   })
 })
 
+
+describe('searchVolumes topic queries', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.doUnmock('../firebase')
+  })
+
+  it('searches the Romance topic by subject instead of broad full text', async () => {
+    const { searchVolumes } = await loadModule(KEY)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ totalItems: 1, items: [] }))
+
+    await searchVolumes('Romance')
+
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('q')).toBe('subject:romance')
+  })
+
+  it('maps Sci-Fi to the Science Fiction subject phrase', async () => {
+    const { searchVolumes } = await loadModule(KEY)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ totalItems: 1, items: [] }))
+
+    await searchVolumes('Sci-Fi')
+
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('q')).toBe('subject:"science fiction"')
+  })
+
+  it('keeps ordinary free-text searches unchanged', async () => {
+    const { searchVolumes } = await loadModule(KEY)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ totalItems: 1, items: [] }))
+
+    await searchVolumes('the secret garden')
+
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('q')).toBe('the secret garden')
+  })
+
+  it('preserves explicit Google Books query operators', async () => {
+    const { searchVolumes } = await loadModule(KEY)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ totalItems: 1, items: [] }))
+
+    await searchVolumes('inauthor:Austen')
+
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('q')).toBe('inauthor:Austen')
+  })
+})
+
 describe('getVolume', () => {
   let fetchMock: ReturnType<typeof vi.fn>
 

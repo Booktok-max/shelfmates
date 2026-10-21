@@ -18,6 +18,36 @@ export function keyHeaders(): Record<string, string> | undefined {
 }
 
 /**
+ * Google Books treats an unqualified query as broad full-text matching. For
+ * known topic shortcuts, scope the request to the subject field so a chip such
+ * as "Romance" finds romance-category books instead of any book that mentions
+ * the word. Leave arbitrary user queries and explicit API operators untouched.
+ */
+const SUBJECT_QUERIES: Readonly<Record<string, string>> = {
+  'sci-fi': 'subject:"science fiction"',
+  'science fiction': 'subject:"science fiction"',
+  fantasy: 'subject:fantasy',
+  mystery: 'subject:mystery',
+  romance: 'subject:romance',
+  'non-fiction': 'subject:nonfiction',
+  nonfiction: 'subject:nonfiction',
+  biography: 'subject:biography',
+  history: 'subject:history',
+  poetry: 'subject:poetry',
+  "children's": 'subject:"juvenile fiction"',
+  'children’s': 'subject:"juvenile fiction"',
+  children: 'subject:"juvenile fiction"',
+};
+
+function queryForSearch(input: string): string {
+  const query = input.trim();
+  if (!query || /^(intitle|inauthor|inpublisher|subject|isbn|lccn|oclc):/i.test(query)) {
+    return query;
+  }
+  return SUBJECT_QUERIES[query.toLowerCase()] ?? query;
+}
+
+/**
  * The Books `volumes?q=` endpoint has returned intermittent 503 `backendFailed`
  * errors for every caller since April 2026 (observed ~17% success on cold
  * requests). It is a provider-side defect, so a short exponential backoff is
@@ -99,7 +129,7 @@ async function readJson<T>(res: Response): Promise<T> {
 
 export async function searchVolumes(q: string, startIndex = 0, maxResults = 20): Promise<GBSearchResult> {
   const res = await gbFetch(
-    `/volumes?q=${encodeURIComponent(q)}&startIndex=${startIndex}&maxResults=${maxResults}&printType=books`,
+    `/volumes?q=${encodeURIComponent(queryForSearch(q))}&startIndex=${startIndex}&maxResults=${maxResults}&printType=books`,
   )
   return readJson<GBSearchResult>(res)
 }
