@@ -5,7 +5,7 @@ import { useAuth } from './auth/AuthContext'
 import Layout from './components/Layout'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
-import { getSharedCatalogueBook } from './api/catalogue'
+import { findSharedCatalogueBook, getSharedCatalogueBook } from './api/catalogue'
 import { buildCatalogueShelfBookDoc } from './data/serialize'
 
 const SignIn = lazy(() => import('./pages/SignIn'))
@@ -47,34 +47,43 @@ function RequireAuth({ children }: { children: ReactElement }) {
 export default function App() {
   const { user, loading, role } = useAuth()
 
-  // Capture the catalogue save before RequireAuth redirects to /signin. The
-  // pending ID remains in localStorage until Firestore confirms the save.
+  // Capture the book identity before RequireAuth redirects to /signin.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const queryId = params.get('saveBook')
     const pathMatch = window.location.pathname.match(/^\\/book\\/catalogue:([0-9a-f-]{36})$/i)
-    const pendingId = queryId || pathMatch?.[1]
-    if (pendingId && /^[0-9a-f-]{36}$/i.test(pendingId)) {
-      localStorage.setItem('atomicShelf.pendingCatalogueSave.v1', pendingId)
+    const pending = queryId && /^[0-9a-f-]{36}$/i.test(queryId)
+      ? { id: queryId }
+      : pathMatch?.[1] ? { id: pathMatch[1] }
+      : params.get('saveBookTitle') && params.get('saveBookAuthor')
+        ? { title: params.get('saveBookTitle'), author: params.get('saveBookAuthor'), isbn: params.get('saveBookIsbn') || undefined }
+        : null
+    if (pending) {
+      localStorage.setItem('atomicShelf.pendingCatalogueSave.v1', JSON.stringify(pending))
       window.history.replaceState({}, '', '/')
     }
   }, [])
 
   useEffect(() => {
     if (loading || !user || role !== 'READER') return
-    const pendingId = localStorage.getItem('atomicShelf.pendingCatalogueSave.v1')
-    if (!pendingId) return
+    const raw = localStorage.getItem('atomicShelf.pendingCatalogueSave.v1')
+    if (!raw) return
+    let pending: { id?: string; title?: string; author?: string; isbn?: string }
+    try { pending = JSON.parse(raw) } catch { pending = { id: raw } }
     let cancelled = false
     ;(async () => {
       try {
-        const book = await getSharedCatalogueBook(pendingId)
-        if (cancelled) return
+        const book = pending.id
+          ? await getSharedCatalogueBook(pending.id)
+          : pending.title && pending.author
+            ? await findSharedCatalogueBook({ title: pending.title, author: pending.author, isbn: pending.isbn })
+            : null
+        if (!book || cancelled) return
         const payload = buildCatalogueShelfBookDoc(user.uid, book, 'To Read')
         await setDoc(doc(db, 'users', user.uid, 'bookshelf', payload.id), payload, { merge: true })
         if (!cancelled) localStorage.removeItem('atomicShelf.pendingCatalogueSave.v1')
       } catch (error) {
-        // Do not clear the handoff on a network or Firestore failure; a reload
-        // after sign-in can safely retry the deterministic document write.
+        // Keep the pending handoff for retry; never save an approximate match.
         console.warn('Shelfmates catalogue save remains pending:', error)
       }
     })()
