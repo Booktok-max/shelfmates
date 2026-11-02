@@ -51,7 +51,7 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const queryId = params.get('saveBook')
-    const pathMatch = window.location.pathname.match(/^\\/book\\/catalogue:([0-9a-f-]{36})$/i)
+    const pathMatch = window.location.pathname.match(/^\/book\/catalogue:([0-9a-f-]{36})$/i)
     const pending = queryId && /^[0-9a-f-]{36}$/i.test(queryId)
       ? { id: queryId }
       : pathMatch?.[1] ? { id: pathMatch[1] }
