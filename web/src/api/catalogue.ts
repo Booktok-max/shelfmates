@@ -22,3 +22,20 @@ export async function getSharedCatalogueBook(id: string): Promise<SharedCatalogu
   if (!data?.book?.id || !data.book.title) throw new Error('Catalogue returned an invalid book record.')
   return data.book as SharedCatalogueBook
 }
+
+export async function findSharedCatalogueBook(input: { title: string; author: string; isbn?: string }): Promise<SharedCatalogueBook> {
+  const query = input.isbn || input.title
+  const response = await fetch(`${CATALOGUE_API}/books?q=${encodeURIComponent(query)}&limit=100`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) throw new Error('Catalogue search is temporarily unavailable.')
+  const data = await response.json()
+  const normalize = (value: string) => value.toLocaleLowerCase().normalize('NFKC').replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim()
+  const title = normalize(input.title)
+  const author = normalize(input.author)
+  const matches = (data.items ?? []).filter((item: any) =>
+    normalize(item.title ?? '') === title && (item.authors ?? []).some((name: string) => normalize(name) === author)
+  )
+  if (matches.length !== 1) throw new Error('No unique exact match was found in the shared catalogue.')
+  return matches[0] as SharedCatalogueBook
+}
