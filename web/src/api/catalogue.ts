@@ -24,7 +24,7 @@ export async function getSharedCatalogueBook(id: string): Promise<SharedCatalogu
 }
 
 export async function findSharedCatalogueBook(input: { title: string; author: string; isbn?: string }): Promise<SharedCatalogueBook> {
-  const query = input.isbn || input.title
+  const query = input.title
   const response = await fetch(`${CATALOGUE_API}/books?q=${encodeURIComponent(query)}&limit=100`, {
     headers: { Accept: 'application/json' },
   })
