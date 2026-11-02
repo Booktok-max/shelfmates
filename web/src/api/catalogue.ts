@@ -30,7 +30,7 @@ export async function findSharedCatalogueBook(input: { title: string; author: st
   })
   if (!response.ok) throw new Error('Catalogue search is temporarily unavailable.')
   const data = await response.json()
-  const normalize = (value: string) => value.toLocaleLowerCase().normalize('NFKC').replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim()
+  const normalize = (value: string) => value.toLocaleLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
   const title = normalize(input.title)
   const author = normalize(input.author)
   const matches = (data.items ?? []).filter((item: any) =>
