@@ -85,6 +85,7 @@ export default function Shelves() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{b.title}</div>
                   <div style={{ fontSize: 12, color: 'var(--sm-text-muted)' }}>{b.authors}</div>
+                  {b.savedAsRecommendation && <div style={{ fontSize: 11, color: 'var(--sm-text-muted)', marginTop: 4 }}>Saved recommendation · catalogue record, not a Google Books edition</div>}
                 </div>
                 <select className="sm-input" style={{ width: 'auto', minWidth: 140 }} value={b.category} onChange={e => moveBook(b.id, e.target.value)}>
                   {['Currently Reading','To Read','Finished', ...shelves.map(s => s.name)].map(c => <option key={c} value={c}>{c}</option>)}
