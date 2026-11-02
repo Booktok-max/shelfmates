@@ -1,8 +1,12 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import type { ReactElement } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import Layout from './components/Layout'
+import { doc, setDoc } from 'firebase/firestore'
+import { db } from './firebase'
+import { getSharedCatalogueBook } from './api/catalogue'
+import { buildCatalogueShelfBookDoc } from './data/serialize'
 
 const SignIn = lazy(() => import('./pages/SignIn'))
 const Home = lazy(() => import('./pages/Home'))
@@ -42,6 +46,40 @@ function RequireAuth({ children }: { children: ReactElement }) {
 
 export default function App() {
   const { user, loading, role } = useAuth()
+
+  // Capture the catalogue save before RequireAuth redirects to /signin. The
+  // pending ID remains in localStorage until Firestore confirms the save.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const queryId = params.get('saveBook')
+    const pathMatch = window.location.pathname.match(/^\\/book\\/catalogue:([0-9a-f-]{36})$/i)
+    const pendingId = queryId || pathMatch?.[1]
+    if (pendingId && /^[0-9a-f-]{36}$/i.test(pendingId)) {
+      localStorage.setItem('atomicShelf.pendingCatalogueSave.v1', pendingId)
+      window.history.replaceState({}, '', '/')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (loading || !user || role !== 'READER') return
+    const pendingId = localStorage.getItem('atomicShelf.pendingCatalogueSave.v1')
+    if (!pendingId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const book = await getSharedCatalogueBook(pendingId)
+        if (cancelled) return
+        const payload = buildCatalogueShelfBookDoc(user.uid, book, 'To Read')
+        await setDoc(doc(db, 'users', user.uid, 'bookshelf', payload.id), payload, { merge: true })
+        if (!cancelled) localStorage.removeItem('atomicShelf.pendingCatalogueSave.v1')
+      } catch (error) {
+        // Do not clear the handoff on a network or Firestore failure; a reload
+        // after sign-in can safely retry the deterministic document write.
+        console.warn('Shelfmates catalogue save remains pending:', error)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [loading, user?.uid, role])
   if (loading) return <div className="sm-container sm-empty">Loading Shelfmates…</div>
   return (
     <Suspense fallback={<PageFallback />}>
