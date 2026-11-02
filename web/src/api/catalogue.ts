@@ -9,7 +9,7 @@ export interface SharedCatalogueBook {
   availability: string
 }
 
-const CATALOGUE_API = (import.meta.env.VITE_CATALOGUE_API_URL as string | undefined)?.replace(/\\/$/, '')
+const CATALOGUE_API = (import.meta.env.VITE_CATALOGUE_API_URL as string | undefined)?.replace(/\/$/, '')
   || 'https://storypal.atomic-shelf.com/api/catalogue'
 
 export async function getSharedCatalogueBook(id: string): Promise<SharedCatalogueBook> {
