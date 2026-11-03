@@ -6,6 +6,9 @@ export interface ShelfBook {
   id: string
   userId: string
   googleBooksId: string
+  catalogueBookId?: string
+  catalogueProvider?: string
+  savedAsRecommendation?: boolean
   title: string
   authors: string
   coverUrl: string

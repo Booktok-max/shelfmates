@@ -34,6 +34,39 @@ export function buildShelfBookDoc(uid: string, volume: GBVolume, category: strin
   }
 }
 
+
+/** Shared Atomic Shelf catalogue records are recommendations, not Google Books volumes.
+ * Keep googleBooksId empty so Android never tries to resolve a catalogue UUID as a GB id.
+ */
+export function buildCatalogueShelfBookDoc(uid: string, book: {
+  id: string; title: string; authors?: string[]; coverUrl?: string | null;
+  description?: string | null; genres?: string[]; language?: string | null;
+}, category: string) {
+  const now = Date.now()
+  return {
+    id: `saved_${uid}_catalogue_${book.id}`,
+    userId: uid,
+    googleBooksId: '',
+    catalogueBookId: book.id,
+    catalogueProvider: 'atomic-shelf',
+    savedAsRecommendation: true,
+    title: book.title,
+    authors: (book.authors ?? []).join(', '),
+    coverUrl: book.coverUrl ?? '',
+    category,
+    description: book.description ?? '',
+    genre: (book.genres ?? []).join(', '),
+    language: book.language ?? '',
+    pageCount: 0,
+    rating: 0,
+    isbn13: '',
+    notes: '',
+    personalRating: 0,
+    savedAt: now,
+    lastUpdated: now,
+  }
+}
+
 export function buildCustomShelfDoc(uid: string, name: string, iconEmoji = '📁') {
   const id = `shelf_${uid}_${name.toLowerCase().replace(/\s+/g, '_')}`
   return {
