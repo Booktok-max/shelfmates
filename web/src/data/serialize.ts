@@ -78,6 +78,7 @@ export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
   title: string
   author: string
   isbn?: string
+  coverUrl?: string
 }, category: string) {
   const normalizedIsbn = String(book.isbn ?? '').replace(/[^0-9Xx]/g, '').toUpperCase()
   const normalize = (value: string) => value
@@ -89,6 +90,13 @@ export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
     ? `isbn-${normalizedIsbn}`
     : `title-${normalize(book.title)}-${normalize(book.author)}`
   const now = Date.now()
+  let safeCoverUrl = ''
+  try {
+    const parsedCoverUrl = new URL(String(book.coverUrl ?? '').trim())
+    if (parsedCoverUrl.protocol === 'https:' && !parsedCoverUrl.username && !parsedCoverUrl.password) {
+      safeCoverUrl = parsedCoverUrl.toString()
+    }
+  } catch { /* An absent or invalid cover is allowed; the detail page shows a placeholder. */ }
   return {
     id: `saved_${uid}_milky_${identity}`,
     userId: uid,
@@ -98,7 +106,7 @@ export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
     savedAsRecommendation: true,
     title: book.title.trim(),
     authors: book.author.trim(),
-    coverUrl: '',
+    coverUrl: safeCoverUrl,
     category,
     description: '',
     genre: '',

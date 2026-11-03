@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useCustomShelves, useShelfBooks } from '../data/shelves'
 import type { CustomShelf } from '../data/shelves'
@@ -83,7 +84,7 @@ export default function Shelves() {
               <div key={b.id} className="sm-card" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 {b.coverUrl ? <img src={b.coverUrl} alt={b.title} style={{ width: 48, height: 72, objectFit: 'cover', borderRadius: 6 }} /> : <div style={{ width:48, height:72, background:'var(--sm-surface-alt)', borderRadius:6 }} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{b.title}</div>
+                  <Link to={`/book/${encodeURIComponent(b.id)}`} style={{ fontWeight: 700, fontSize: 14, color: "var(--sm-text)", textDecoration: "none" }}>{b.title}</Link>
                   <div style={{ fontSize: 12, color: 'var(--sm-text-muted)' }}>{b.authors}</div>
                   {b.savedAsRecommendation && <div style={{ fontSize: 11, color: 'var(--sm-text-muted)', marginTop: 4 }}>Saved recommendation · catalogue record, not a Google Books edition</div>}
                 </div>
