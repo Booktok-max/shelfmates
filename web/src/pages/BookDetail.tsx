@@ -84,7 +84,7 @@ export default function BookDetail() {
               : <div role="img" aria-label="Cover not available" style={{ width: '100%', aspectRatio: '2/3', background: 'var(--sm-surface-alt)', borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--sm-text-muted)', padding: 12, boxSizing: 'border-box', textAlign: 'center' }}>Cover not available</div>}
           </div>
           <div style={{ flex: '1 1 280px' }}>
-            {savedBook.savedAsRecommendation && <span className="sm-chip">{savedBook.catalogueProvider === 'milky' ? 'Milky catalogue recommendation' : 'Catalogue recommendation'}</span>}
+            {savedBook.savedAsRecommendation && <span className="sm-chip">{savedBook.catalogueProvider === 'milky' ? 'From The Big Shelf' : 'Catalogue recommendation'}</span>}
             <h1 style={{ margin: '10px 0 0', fontSize: 24 }}>{savedBook.title}</h1>
             <p style={{ color: 'var(--sm-text-muted)', margin: '4px 0 12px' }}>{savedBook.authors}</p>
             {savedBook.genre && <span className="sm-chip">{savedBook.genre}</span>}
