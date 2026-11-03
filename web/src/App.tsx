@@ -106,7 +106,7 @@ export default function App() {
           localStorage.removeItem('atomicShelf.pendingCatalogueSave.v1')
           setCatalogueSaveNotice({
             kind: 'success',
-            message: `Saved “${savedTitle}” to your To Read shelf${payload.catalogueProvider === 'milky' ? ' as a Milky catalogue recommendation' : ''}.`,
+            message: `Saved “${savedTitle}” to your To Read shelf${payload.catalogueProvider === 'milky' ? ' as a recommendation from The Big Shelf' : ''}.`,
           })
         }
       } catch (error) {
