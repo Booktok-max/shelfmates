@@ -61,19 +61,15 @@ export default function App() {
         : null
     if (pending) {
       localStorage.setItem('atomicShelf.pendingCatalogueSave.v1', JSON.stringify(pending))
-      setCatalogueSaveNotice({ kind: 'info', message: 'Book received. Sign in with a Reader account to save it to your shelf.' })
+      setCatalogueSaveNotice({ kind: 'info', message: 'Book received. Sign in to your Shelfmates account to save it to your shelf.' })
       window.history.replaceState({}, '', '/')
     }
   }, [])
 
   useEffect(() => {
-    if (loading || !user) return
+    if (loading || !user || !role) return
     const raw = localStorage.getItem('atomicShelf.pendingCatalogueSave.v1')
     if (!raw) return
-    if (role !== 'READER') {
-      setCatalogueSaveNotice({ kind: 'error', message: 'This handoff needs a Reader account. The book has not been saved.' })
-      return
-    }
     let pending: { id?: string; title?: string; author?: string; isbn?: string }
     try { pending = JSON.parse(raw) } catch { pending = { id: raw } }
     let cancelled = false
