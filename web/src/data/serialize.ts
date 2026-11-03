@@ -83,7 +83,7 @@ export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
   const normalize = (value: string) => value
     .normalize('NFKC')
     .toLocaleLowerCase()
-    .replace(/[^\\p{L}\\p{N}]+/gu, '-')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '')
   const identity = normalizedIsbn
     ? `isbn-${normalizedIsbn}`
@@ -104,7 +104,7 @@ export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
     genre: '',
     pageCount: 0,
     rating: 0,
-    isbn13: /^\\d{13}$/.test(normalizedIsbn) ? normalizedIsbn : '',
+    isbn13: /^\d{13}$/.test(normalizedIsbn) ? normalizedIsbn : '',
     sourceIsbn: normalizedIsbn,
     notes: '',
     personalRating: 0,
