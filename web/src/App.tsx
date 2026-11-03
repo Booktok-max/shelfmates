@@ -110,7 +110,7 @@ export default function App() {
           })
         }
       } catch (error) {
-        // Keep the pending handoff for retry; never save an approximate match.
+        // Keep the pending handoff if the actual Firestore write or a direct catalogue-ID lookup fails.
         console.warn('Shelfmates catalogue save remains pending:', error)
         if (!cancelled) {
           const reason = error instanceof Error ? error.message : 'A temporary error prevented the save.'
