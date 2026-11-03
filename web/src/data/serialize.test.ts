@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildShelfBookDoc,
+  buildMilkyRecommendationShelfBookDoc,
   buildCustomShelfDoc,
   buildReadingProgressDoc,
   buildProfileDoc,
@@ -89,5 +90,56 @@ describe('buildClubMembershipDoc', () => {
     const doc = buildClubMembershipDoc('uid1', 'club_42')
     expect(doc.userId).toBe('uid1')
     expect(doc.clubId).toBe('club_42')
+  })
+})
+
+describe('buildMilkyRecommendationShelfBookDoc', () => {
+  it('creates an idempotent recommendation keyed by ISBN-13', () => {
+    const first = buildMilkyRecommendationShelfBookDoc('reader-1', {
+      title: 'Want to Know a Secret?',
+      author: 'Freida McFadden',
+      isbn: '979-8-59646-257-9',
+    }, 'To Read')
+    const retry = buildMilkyRecommendationShelfBookDoc('reader-1', {
+      title: 'Want to Know a Secret?',
+      author: 'Freida McFadden',
+      isbn: '9798596462579',
+    }, 'To Read')
+
+    expect(first.id).toBe(retry.id)
+    expect(first.catalogueProvider).toBe('milky')
+    expect(first.savedAsRecommendation).toBe(true)
+    expect(first.googleBooksId).toBe('')
+    expect(first.isbn13).toBe('9798596462579')
+    expect(first.sourceIsbn).toBe('9798596462579')
+    expect(first.title).toBe('Want to Know a Secret?')
+    expect(first.authors).toBe('Freida McFadden')
+  })
+
+  it('uses normalized title and author when no ISBN is supplied', () => {
+    const first = buildMilkyRecommendationShelfBookDoc('reader-1', {
+      title: 'The Secret Garden',
+      author: 'Frances Hodgson Burnett',
+    }, 'To Read')
+    const retry = buildMilkyRecommendationShelfBookDoc('reader-1', {
+      title: '  The Secret Garden ',
+      author: ' Frances Hodgson Burnett ',
+    }, 'To Read')
+
+    expect(first.id).toBe(retry.id)
+    expect(first.catalogueProvider).toBe('milky')
+    expect(first.isbn13).toBe('')
+    expect(first.sourceIsbn).toBe('')
+  })
+
+  it('preserves ISBN-10 without mislabelling it as ISBN-13', () => {
+    const result = buildMilkyRecommendationShelfBookDoc('reader-1', {
+      title: 'A Book',
+      author: 'An Author',
+      isbn: '0-306-40615-2',
+    }, 'To Read')
+
+    expect(result.isbn13).toBe('')
+    expect(result.sourceIsbn).toBe('0306406152')
   })
 })

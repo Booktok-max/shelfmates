@@ -6,7 +6,7 @@ import Layout from './components/Layout'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
 import { findSharedCatalogueBook, getSharedCatalogueBook } from './api/catalogue'
-import { buildCatalogueShelfBookDoc } from './data/serialize'
+import { buildCatalogueShelfBookDoc, buildMilkyRecommendationShelfBookDoc } from './data/serialize'
 
 const SignIn = lazy(() => import('./pages/SignIn'))
 const Home = lazy(() => import('./pages/Home'))
@@ -76,21 +76,41 @@ export default function App() {
     ;(async () => {
       try {
         setCatalogueSaveNotice({ kind: 'info', message: 'Checking the catalogue and saving your book…' })
-        const book = pending.id
-          ? await getSharedCatalogueBook(pending.id)
-          : pending.title && pending.author
-            ? await findSharedCatalogueBook({ title: pending.title, author: pending.author, isbn: pending.isbn })
-            : null
-        if (!book) throw new Error('The book details were incomplete, so it was not saved.')
         if (cancelled) return
-        const payload = buildCatalogueShelfBookDoc(user.uid, book, 'To Read')
+        let payload: ReturnType<typeof buildCatalogueShelfBookDoc> | ReturnType<typeof buildMilkyRecommendationShelfBookDoc>
+        let savedTitle = ''
+        if (pending.id) {
+          const book = await getSharedCatalogueBook(pending.id)
+          payload = buildCatalogueShelfBookDoc(user.uid, book, 'To Read')
+          savedTitle = book.title
+        } else if (pending.title && pending.author) {
+          // Prefer the canonical shared-catalogue record when one exists. Milky
+          // also carries books outside StoryPal's catalogue (including modern
+          // adult titles), so a miss must not block saving the supplied book
+          // identity as a Shelfmates recommendation.
+          const sharedBook = await findSharedCatalogueBook({
+            title: pending.title, author: pending.author, isbn: pending.isbn,
+          }).catch(() => null)
+          payload = sharedBook
+            ? buildCatalogueShelfBookDoc(user.uid, sharedBook, 'To Read')
+            : buildMilkyRecommendationShelfBookDoc(user.uid, {
+                title: pending.title, author: pending.author, isbn: pending.isbn,
+              }, 'To Read')
+          savedTitle = pending.title
+        } else {
+          throw new Error('The book details were incomplete, so it was not saved.')
+        }
+        if (cancelled) return
         await setDoc(doc(db, 'users', user.uid, 'bookshelf', payload.id), payload, { merge: true })
         if (!cancelled) {
           localStorage.removeItem('atomicShelf.pendingCatalogueSave.v1')
-          setCatalogueSaveNotice({ kind: 'success', message: `Saved “${book.title}” to your To Read shelf.` })
+          setCatalogueSaveNotice({
+            kind: 'success',
+            message: `Saved “${savedTitle}” to your To Read shelf${payload.catalogueProvider === 'milky' ? ' as a Milky catalogue recommendation' : ''}.`,
+          })
         }
       } catch (error) {
-        // Keep the pending handoff for retry; never save an approximate match.
+        // Keep the pending handoff if the actual Firestore write or a direct catalogue-ID lookup fails.
         console.warn('Shelfmates catalogue save remains pending:', error)
         if (!cancelled) {
           const reason = error instanceof Error ? error.message : 'A temporary error prevented the save.'
