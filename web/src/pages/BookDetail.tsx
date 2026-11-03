@@ -36,7 +36,7 @@ export default function BookDetail() {
         if (id!.startsWith('saved_')) {
           const snapshot = await getDoc(doc(db, 'users', user!.uid, 'bookshelf', id!))
           if (!snapshot.exists()) throw new Error('This saved book could not be found on your shelf.')
-          const book = { id: snapshot.id, ...(snapshot.data() as ShelfBook) }
+          const book = { ...(snapshot.data() as ShelfBook), id: snapshot.id }
           if (book.savedAsRecommendation || !book.googleBooksId) {
             if (active) setSavedBook(book)
             return
