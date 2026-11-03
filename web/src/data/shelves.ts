@@ -9,6 +9,7 @@ export interface ShelfBook {
   catalogueBookId?: string
   catalogueProvider?: string
   savedAsRecommendation?: boolean
+  sourceIsbn?: string
   title: string
   authors: string
   coverUrl: string
