@@ -99,6 +99,7 @@ describe('buildMilkyRecommendationShelfBookDoc', () => {
       title: 'Want to Know a Secret?',
       author: 'Freida McFadden',
       isbn: '979-8-59646-257-9',
+      coverUrl: 'https://covers.openlibrary.org/b/id/123-L.jpg',
     }, 'To Read')
     const retry = buildMilkyRecommendationShelfBookDoc('reader-1', {
       title: 'Want to Know a Secret?',
@@ -114,6 +115,7 @@ describe('buildMilkyRecommendationShelfBookDoc', () => {
     expect(first.sourceIsbn).toBe('9798596462579')
     expect(first.title).toBe('Want to Know a Secret?')
     expect(first.authors).toBe('Freida McFadden')
+    expect(first.coverUrl).toBe('https://covers.openlibrary.org/b/id/123-L.jpg')
   })
 
   it('uses normalized title and author when no ISBN is supplied', () => {

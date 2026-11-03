@@ -57,7 +57,7 @@ export default function App() {
       ? { id: queryId }
       : pathMatch?.[1] ? { id: pathMatch[1] }
       : params.get('saveBookTitle') && params.get('saveBookAuthor')
-        ? { title: params.get('saveBookTitle'), author: params.get('saveBookAuthor'), isbn: params.get('saveBookIsbn') || undefined }
+        ? { title: params.get('saveBookTitle'), author: params.get('saveBookAuthor'), isbn: params.get('saveBookIsbn') || undefined, coverUrl: params.get('saveBookCover') || undefined }
         : null
     if (pending) {
       localStorage.setItem('atomicShelf.pendingCatalogueSave.v1', JSON.stringify(pending))
@@ -70,7 +70,7 @@ export default function App() {
     if (loading || !user || !role) return
     const raw = localStorage.getItem('atomicShelf.pendingCatalogueSave.v1')
     if (!raw) return
-    let pending: { id?: string; title?: string; author?: string; isbn?: string }
+    let pending: { id?: string; title?: string; author?: string; isbn?: string; coverUrl?: string }
     try { pending = JSON.parse(raw) } catch { pending = { id: raw } }
     let cancelled = false
     ;(async () => {
@@ -94,7 +94,7 @@ export default function App() {
           payload = sharedBook
             ? buildCatalogueShelfBookDoc(user.uid, sharedBook, 'To Read')
             : buildMilkyRecommendationShelfBookDoc(user.uid, {
-                title: pending.title, author: pending.author, isbn: pending.isbn,
+                title: pending.title, author: pending.author, isbn: pending.isbn, coverUrl: pending.coverUrl,
               }, 'To Read')
           savedTitle = pending.title
         } else {

@@ -3,15 +3,17 @@ import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { getVolume, coverUrl, authorsStr } from '../api/googleBooks'
 import { useCustomShelves } from '../data/shelves'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { buildShelfBookDoc } from '../data/serialize'
+import type { ShelfBook } from '../data/shelves'
 
 export default function BookDetail() {
   const { id } = useParams()
   const { user } = useAuth()
   const { shelves } = useCustomShelves(user?.uid ?? null)
   const [volume, setVolume] = useState<any>(null)
+  const [savedBook, setSavedBook] = useState<ShelfBook | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [category, setCategory] = useState('To Read')
@@ -19,10 +21,43 @@ export default function BookDetail() {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    if (!id) return
+    if (!id || !user) return
+    let active = true
     setLoading(true)
-    getVolume(id).then(v => { setVolume(v); setLoading(false) }).catch(e => { setError(e?.message); setLoading(false) })
-  }, [id])
+    setError(null)
+    setVolume(null)
+    setSavedBook(null)
+
+    async function loadBook() {
+      try {
+        // Saved shelf links use the Firestore document id. A Milky
+        // recommendation is not a Google Books volume, so resolve it from the
+        // signed-in reader's shelf and never send its synthetic id to Google.
+        if (id!.startsWith('saved_')) {
+          const snapshot = await getDoc(doc(db, 'users', user!.uid, 'bookshelf', id!))
+          if (!snapshot.exists()) throw new Error('This saved book could not be found on your shelf.')
+          const book = { ...(snapshot.data() as ShelfBook), id: snapshot.id }
+          if (book.savedAsRecommendation || !book.googleBooksId) {
+            if (active) setSavedBook(book)
+            return
+          }
+          const result = await getVolume(book.googleBooksId)
+          if (active) setVolume(result)
+          return
+        }
+
+        const result = await getVolume(id!)
+        if (active) setVolume(result)
+      } catch (e: any) {
+        if (active) setError(e?.message ?? 'The book could not be loaded.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadBook()
+    return () => { active = false }
+  }, [id, user?.uid])
 
   async function save() {
     if (!user || !volume) return
@@ -36,7 +71,37 @@ export default function BookDetail() {
   }
 
   if (loading) return <div className="sm-container sm-empty">Loading…</div>
-  if (error || !volume) return <div className="sm-container sm-empty"><h3>Book not found</h3><p>{error}</p><Link to="/discover" className="sm-btn sm-btn-ghost">Back</Link></div>
+  if (error || (!volume && !savedBook)) return <div className="sm-container sm-empty"><h3>Book not found</h3><p>{error ?? 'This book could not be loaded.'}</p><Link to="/shelves" className="sm-btn sm-btn-ghost">Back to shelves</Link></div>
+
+  if (savedBook) {
+    return (
+      <div className="sm-container">
+        <Link to="/shelves" style={{ color: 'var(--sm-text-muted)', fontSize: 14 }}>← Your shelves</Link>
+        <div style={{ display: 'flex', gap: 20, marginTop: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: '0 0 180px' }}>
+            {savedBook.coverUrl
+              ? <img src={savedBook.coverUrl} alt={savedBook.title} style={{ width: '100%', borderRadius: 12, boxShadow: 'var(--sm-shadow-lg)' }} />
+              : <div role="img" aria-label="Cover not available" style={{ width: '100%', aspectRatio: '2/3', background: 'var(--sm-surface-alt)', borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--sm-text-muted)', padding: 12, boxSizing: 'border-box', textAlign: 'center' }}>Cover not available</div>}
+          </div>
+          <div style={{ flex: '1 1 280px' }}>
+            {savedBook.savedAsRecommendation && <span className="sm-chip">{savedBook.catalogueProvider === 'milky' ? 'Milky catalogue recommendation' : 'Catalogue recommendation'}</span>}
+            <h1 style={{ margin: '10px 0 0', fontSize: 24 }}>{savedBook.title}</h1>
+            <p style={{ color: 'var(--sm-text-muted)', margin: '4px 0 12px' }}>{savedBook.authors}</p>
+            {savedBook.genre && <span className="sm-chip">{savedBook.genre}</span>}
+            {(savedBook.isbn13 || savedBook.sourceIsbn) && (
+              <p style={{ color: 'var(--sm-text-muted)', fontSize: 13 }}>ISBN: {savedBook.isbn13 || savedBook.sourceIsbn}</p>
+            )}
+            {savedBook.description && <p style={{ fontSize: 14, lineHeight: 1.6 }}>{savedBook.description}</p>}
+            {savedBook.savedAsRecommendation && (
+              <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--sm-text-muted)', marginTop: 16 }}>
+                This is a saved book recommendation. A digital reading edition is not attached to this record.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const v = volume.volumeInfo
   const cats = ['Currently Reading', 'To Read', 'Finished', ...shelves.map(s => s.name)]
