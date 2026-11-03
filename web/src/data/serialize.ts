@@ -67,6 +67,52 @@ export function buildCatalogueShelfBookDoc(uid: string, book: {
   }
 }
 
+
+/**
+ * Milky may hand off books that are not represented in StoryPal's shared
+ * catalogue. Save those as metadata-only recommendations instead of blocking
+ * the reader. The deterministic key makes retries idempotent per ISBN, or
+ * per normalized title/author when no ISBN is available.
+ */
+export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
+  title: string
+  author: string
+  isbn?: string
+}, category: string) {
+  const normalizedIsbn = String(book.isbn ?? '').replace(/[^0-9Xx]/g, '').toUpperCase()
+  const normalize = (value: string) => value
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[^\\p{L}\\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+  const identity = normalizedIsbn
+    ? `isbn-${normalizedIsbn}`
+    : `title-${normalize(book.title)}-${normalize(book.author)}`
+  const now = Date.now()
+  return {
+    id: `saved_${uid}_milky_${identity}`,
+    userId: uid,
+    googleBooksId: '',
+    catalogueBookId: `milky:${identity}`,
+    catalogueProvider: 'milky',
+    savedAsRecommendation: true,
+    title: book.title.trim(),
+    authors: book.author.trim(),
+    coverUrl: '',
+    category,
+    description: '',
+    genre: '',
+    pageCount: 0,
+    rating: 0,
+    isbn13: /^\\d{13}$/.test(normalizedIsbn) ? normalizedIsbn : '',
+    sourceIsbn: normalizedIsbn,
+    notes: '',
+    personalRating: 0,
+    savedAt: now,
+    lastUpdated: now,
+  }
+}
+
 export function buildCustomShelfDoc(uid: string, name: string, iconEmoji = '📁') {
   const id = `shelf_${uid}_${name.toLowerCase().replace(/\s+/g, '_')}`
   return {
