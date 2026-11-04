@@ -59,3 +59,26 @@ Local buildup policy:
 7. This is a checkpoint-based control, not background surveillance. If the local machine is not connected/visible, explicitly request a fresh read-only inventory rather than claiming to monitor it.
 
 Recommended cadence: one baseline inventory now; a short status capture before and after each milestone; a full three-repository reconciliation before release. Avoid repeatedly dumping full diffs unless a specific change needs review; file lists and diff statistics are the default, with targeted diff inspection for risk or acceptance.
+
+
+## Mandatory milestone checkpoint and remote synchronization
+
+After every major implementation, bug-fix, integration, refactor, or documentation milestone, stop before beginning another substantial task.
+
+1. Inspect the full local Git state and fetch the actual product remote.
+2. Report repository, path, branch, local HEAD SHA, upstream branch/SHA, remote SHA, ahead/behind counts, modified/staged/deleted/untracked files, local-only commits, stashes/worktrees where relevant, and diff statistics.
+3. Identify the exact files belonging to this milestone. Separate pre-existing and unrelated changes; preserve them.
+4. Run the relevant milestone tests and record exact commands/results. Do not confuse passing unit tests with end-to-end acceptance.
+5. Prepare a scoped checkpoint: proposed commit message, exact file list, target feature branch, and push destination.
+6. STOP for explicit user approval before committing or pushing. A general request to implement a feature is not approval to publish unrelated or unreviewed files.
+7. After approval, stage only the approved explicit paths (never use `git add .` or `git add -A` as a shortcut), inspect the staged diff, commit, and push to the approved feature branch.
+8. Fetch again and verify the remote branch SHA equals the pushed local commit SHA. Report the commit SHA and PR URL.
+9. Update `docs/PROJECT-STATUS.md` or the repository's designated status/recovery document with the checkpoint, remaining work, blockers and next three actions.
+
+If publishing is blocked, preserve the local work and report the exact failure. Do not silently accumulate another milestone on top of an unpublished one.
+
+Never force-push, reset, clean, stash, overwrite unrelated work, push directly to the default branch, merge, or deploy without explicit approval.
+
+A milestone is not remotely synchronized until the remote SHA is verified. GitHub synchronization is not proof that product acceptance criteria have passed.
+
+This is checkpoint-based oversight, not background monitoring. If the local machine/worktree is not accessible, explicitly request a fresh read-only local inventory; never claim to have inspected local state from GitHub alone.
