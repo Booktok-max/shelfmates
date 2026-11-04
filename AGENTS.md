@@ -38,3 +38,24 @@ Every progress report must include:
 - acceptance criteria passed/failed/unverified;
 - blockers and production-gated items;
 - next three actions.
+
+
+## Local-work visibility and continuous change control
+
+A remote branch is not a substitute for inspecting the user's local checkout. Before every task and after every meaningful milestone, capture and report:
+- all relevant local repository paths and worktrees;
+- branch, HEAD SHA, upstream and remote-tracking divergence (state whether remotes were fetched; do not fetch without permission if network/auth implications are unclear);
+- porcelain status, staged/unstaged/untracked file lists, and diff statistics;
+- stashes, linked worktrees and other branches that may contain task work;
+- whether local changes are represented on a remote branch/PR, and exactly which changes remain local-only.
+
+Local buildup policy:
+1. Do not allow a feature milestone to accumulate substantial unreviewed local-only changes across multiple repositories without a written inventory.
+2. Keep unrelated changes separate; never bundle them into a PR merely to make the tree clean.
+3. At each milestone, reconcile the task's local changes to a named remote feature branch and reviewable PR only after explicit authorization to publish. Until then, label them LOCAL-ONLY and preserve them.
+4. Maintain a local-change ledger in the recovery report: repository/path, branch, baseline SHA, current SHA, exact changed/untracked files, purpose, related PR/remote branch, tests, and next action.
+5. Before switching tasks or repositories, record the current ledger and unresolved changes. Do not leave the status implicit in chat history.
+6. At the start of each new work session, compare the local ledger with current GitHub state and call out drift before editing.
+7. This is a checkpoint-based control, not background surveillance. If the local machine is not connected/visible, explicitly request a fresh read-only inventory rather than claiming to monitor it.
+
+Recommended cadence: one baseline inventory now; a short status capture before and after each milestone; a full three-repository reconciliation before release. Avoid repeatedly dumping full diffs unless a specific change needs review; file lists and diff statistics are the default, with targeted diff inspection for risk or acceptance.
