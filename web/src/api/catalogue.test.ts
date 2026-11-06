@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CatalogueLookupError, findSharedCatalogueBook } from './catalogue'
+import { findSharedCatalogueBook } from './catalogue'
 
 const book = (id: string, title: string, authors: string[], editions: Array<{ isbn10?: string; isbn13?: string }> = []) => ({
   id, title, authors, editions, coverUrl: null, description: null, genres: [], language: 'en', availability: 'metadata_only',
