@@ -69,6 +69,6 @@ export function parsePendingCatalogueSave(raw: unknown): PendingCatalogueSaveRes
 /** Stable key used to prevent duplicate processing while an effect re-runs. */
 export function pendingCatalogueSaveKey(pending: PendingCatalogueSave): string {
   if (pending.id) return `id:${pending.id.toLowerCase()}`
-  const normalize = (part: string) => part.normalize('NFKC').toLocaleLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim()
+  const normalize = (part: string) => part.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
   return `book:${normalize(pending.title ?? '')}|${normalize(pending.author ?? '')}|${pending.isbn ?? ''}`
 }
