@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
@@ -127,8 +127,9 @@ export default function App() {
     }
   }, [user?.uid])
 
-  // Capture book identity before RequireAuth redirects to /signin.
-  useEffect(() => {
+  // Capture book identity in the layout phase, before child <Navigate> passive effects
+  // can replace the incoming URL while RequireAuth redirects an unsigned-in reader.
+  useLayoutEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const queryId = params.get('saveBook')
     const pathMatch = window.location.pathname.match(/^\/book\/catalogue:([0-9a-f-]{36})$/i)
