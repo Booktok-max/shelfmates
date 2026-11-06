@@ -211,7 +211,7 @@ export default function App() {
             {catalogueSaveNotice.message}
             {catalogueSaveNotice.kind === 'error' && (
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <button className="sm-btn sm-btn-primary" onClick={retryPendingSave}>Retry save</button>
+                {user && role && <button className="sm-btn sm-btn-primary" onClick={retryPendingSave}>Retry save</button>}
                 <button className="sm-btn sm-btn-ghost" onClick={dismissPendingSave}>Dismiss</button>
               </div>
             )}
