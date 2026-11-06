@@ -36,7 +36,7 @@ async function catalogueJson(url: string): Promise<any> {
   }
 
   if (!response.ok) {
-    if (response.status === 404) throw new CatalogueLookupError('not-found', 'The catalogue record was not found.')
+    if (response.status === 404) throw new CatalogueLookupError('invalid', 'The catalogue endpoint or record was not found.')
     if (response.status === 429 || response.status >= 500) {
       throw new CatalogueLookupError('retryable', 'The catalogue is temporarily unavailable. Your save is still pending.')
     }
