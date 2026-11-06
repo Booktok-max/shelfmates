@@ -113,7 +113,7 @@ export default function App() {
       setAmbiguousPending(null)
       setCatalogueSaveNotice({
         kind: 'success',
-        message: 'Saved “' + savedTitle + '” to your To Read shelf' + (payload.catalogueProvider === 'milky' ? ' as a recommendation from The Big Shelf' : '') + '.',
+        message: 'Saved ' + savedTitle + ' to your To Read shelf' + (payload.catalogueProvider === 'milky' ? ' as a recommendation from The Big Shelf' : '') + '.',
       })
     } catch (error) {
       console.warn('Shelfmates catalogue save remains pending:', error)
