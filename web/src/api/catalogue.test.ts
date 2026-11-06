@@ -41,6 +41,12 @@ describe('shared catalogue matching', () => {
       .rejects.toMatchObject({ kind: 'not-found' })
   })
 
+  it('treats an HTTP 404 as a permanent endpoint or record failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
+    await expect(findSharedCatalogueBook({ title: 'A Book', author: 'An Author' }))
+      .rejects.toMatchObject({ kind: 'invalid' })
+  })
+
   it('keeps transient server failures retryable instead of treating them as a catalogue miss', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
     await expect(findSharedCatalogueBook({ title: 'A Book', author: 'An Author' }))
