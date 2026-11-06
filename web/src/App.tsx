@@ -113,14 +113,14 @@ export default function App() {
       setAmbiguousPending(null)
       setCatalogueSaveNotice({
         kind: 'success',
-        message: `Saved “${savedTitle}” to your To Read shelf${payload.catalogueProvider === 'milky' ? ' as a recommendation from The Big Shelf' : ''}.`,
+        message: 'Saved “' + savedTitle + '” to your To Read shelf' + (payload.catalogueProvider === 'milky' ? ' as a recommendation from The Big Shelf' : '') + '.',
       })
     } catch (error) {
       console.warn('Shelfmates catalogue save remains pending:', error)
       const reason = error instanceof Error ? error.message : 'A temporary error prevented the save.'
       setCatalogueSaveNotice({
         kind: 'error',
-        message: `${reason} Your book has not been saved; the request is kept for retry.`,
+        message: reason + ' Your book has not been saved; the request is kept for retry.',
       })
     } finally {
       if (processingKey.current === key) processingKey.current = null
