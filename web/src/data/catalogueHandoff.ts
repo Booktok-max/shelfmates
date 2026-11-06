@@ -10,7 +10,7 @@ export type PendingCatalogueSaveResult =
   | { ok: true; value: PendingCatalogueSave }
   | { ok: false; reason: string }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function normalizeHandoffIsbn(value: unknown): string | undefined {
   const normalized = String(value ?? '').replace(/[^0-9Xx]/g, '').toUpperCase()
