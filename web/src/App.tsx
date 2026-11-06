@@ -1,12 +1,13 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import Layout from './components/Layout'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
-import { findSharedCatalogueBook, getSharedCatalogueBook } from './api/catalogue'
+import { CatalogueLookupError, findSharedCatalogueBook, getSharedCatalogueBook, type SharedCatalogueBook } from './api/catalogue'
 import { buildCatalogueShelfBookDoc, buildMilkyRecommendationShelfBookDoc } from './data/serialize'
+import { parsePendingCatalogueSave, pendingCatalogueSaveKey, type PendingCatalogueSave } from './data/catalogueHandoff'
 
 const SignIn = lazy(() => import('./pages/SignIn'))
 const Home = lazy(() => import('./pages/Home'))
@@ -47,79 +48,146 @@ function RequireAuth({ children }: { children: ReactElement }) {
 export default function App() {
   const { user, loading, role } = useAuth()
   const [catalogueSaveNotice, setCatalogueSaveNotice] = useState<{ kind: 'info' | 'success' | 'error'; message: string } | null>(null)
+  const [ambiguousBooks, setAmbiguousBooks] = useState<SharedCatalogueBook[]>([])
+  const [ambiguousPending, setAmbiguousPending] = useState<PendingCatalogueSave | null>(null)
+  const processingKey = useRef<string | null>(null)
 
-  // Capture the book identity before RequireAuth redirects to /signin.
+  const savePending = useCallback(async (pending: PendingCatalogueSave, selectedBook?: SharedCatalogueBook) => {
+    const uid = user?.uid
+    if (!uid) return
+    const key = pendingCatalogueSaveKey(pending)
+    if (processingKey.current === key) return
+    processingKey.current = key
+
+    try {
+      setCatalogueSaveNotice({ kind: 'info', message: 'Checking the catalogue and saving your book…' })
+      let payload: ReturnType<typeof buildCatalogueShelfBookDoc> | ReturnType<typeof buildMilkyRecommendationShelfBookDoc>
+      let savedTitle = pending.title ?? ''
+
+      if (selectedBook) {
+        payload = buildCatalogueShelfBookDoc(uid, selectedBook, 'To Read')
+        savedTitle = selectedBook.title
+      } else if (pending.id) {
+        const book = await getSharedCatalogueBook(pending.id)
+        payload = buildCatalogueShelfBookDoc(uid, book, 'To Read')
+        savedTitle = book.title
+      } else if (pending.title && pending.author) {
+        try {
+          const sharedBook = await findSharedCatalogueBook({
+            title: pending.title,
+            author: pending.author,
+            isbn: pending.isbn,
+          })
+          payload = buildCatalogueShelfBookDoc(uid, sharedBook, 'To Read')
+        } catch (error) {
+          if (error instanceof CatalogueLookupError && error.kind === 'ambiguous') {
+            setAmbiguousBooks(error.matches)
+            setAmbiguousPending(pending)
+            setCatalogueSaveNotice({
+              kind: 'info',
+              message: 'Which edition did you mean? Choose the matching catalogue record before saving.',
+            })
+            return
+          }
+          if (error instanceof CatalogueLookupError && error.kind === 'not-found') {
+            // Milky can contain a valid book that StoryPal's shared catalogue
+            // does not yet know. Preserve it as a recommendation, not a fake
+            // Google Books edition. Network/5xx failures never take this path.
+            payload = buildMilkyRecommendationShelfBookDoc(uid, {
+              title: pending.title,
+              author: pending.author,
+              isbn: pending.isbn,
+              coverUrl: pending.coverUrl,
+            }, 'To Read')
+          } else {
+            throw error
+          }
+        }
+      } else {
+        throw new Error('The book details were incomplete, so it was not saved.')
+      }
+
+      await setDoc(doc(db, 'users', uid, 'bookshelf', payload.id), payload, { merge: true })
+      localStorage.removeItem('atomicShelf.pendingCatalogueSave.v1')
+      setAmbiguousBooks([])
+      setAmbiguousPending(null)
+      setCatalogueSaveNotice({
+        kind: 'success',
+        message: \`Saved “\${savedTitle}” to your To Read shelf\${payload.catalogueProvider === 'milky' ? ' as a recommendation from The Big Shelf' : ''}.\`,
+      })
+    } catch (error) {
+      console.warn('Shelfmates catalogue save remains pending:', error)
+      const reason = error instanceof Error ? error.message : 'A temporary error prevented the save.'
+      setCatalogueSaveNotice({
+        kind: 'error',
+        message: \`\${reason} Your book has not been saved; the request is kept for retry.\`,
+      })
+    } finally {
+      if (processingKey.current === key) processingKey.current = null
+    }
+  }, [user?.uid])
+
+  // Capture book identity before RequireAuth redirects to /signin.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const queryId = params.get('saveBook')
     const pathMatch = window.location.pathname.match(/^\/book\/catalogue:([0-9a-f-]{36})$/i)
-    const pending = queryId && /^[0-9a-f-]{36}$/i.test(queryId)
+    const incoming = queryId
       ? { id: queryId }
       : pathMatch?.[1] ? { id: pathMatch[1] }
-      : params.get('saveBookTitle') && params.get('saveBookAuthor')
-        ? { title: params.get('saveBookTitle'), author: params.get('saveBookAuthor'), isbn: params.get('saveBookIsbn') || undefined, coverUrl: params.get('saveBookCover') || undefined }
+      : params.get('saveBookTitle') || params.get('saveBookAuthor')
+        ? {
+            title: params.get('saveBookTitle'),
+            author: params.get('saveBookAuthor'),
+            isbn: params.get('saveBookIsbn'),
+            coverUrl: params.get('saveBookCover'),
+          }
         : null
-    if (pending) {
-      localStorage.setItem('atomicShelf.pendingCatalogueSave.v1', JSON.stringify(pending))
-      setCatalogueSaveNotice({ kind: 'info', message: 'Book received. Sign in to your Shelfmates account to save it to your shelf.' })
-      window.history.replaceState({}, '', '/')
+
+    if (!incoming) return
+    const parsed = parsePendingCatalogueSave(incoming)
+    if (parsed.ok) {
+      localStorage.setItem('atomicShelf.pendingCatalogueSave.v1', JSON.stringify(parsed.value))
+      setCatalogueSaveNotice({
+        kind: 'info',
+        message: 'Book received. Sign in to your Shelfmates account to save it to your To Read shelf.',
+      })
+    } else {
+      setCatalogueSaveNotice({ kind: 'error', message: parsed.reason })
     }
+    window.history.replaceState({}, '', '/')
   }, [])
 
   useEffect(() => {
     if (loading || !user || !role) return
     const raw = localStorage.getItem('atomicShelf.pendingCatalogueSave.v1')
     if (!raw) return
-    let pending: { id?: string; title?: string; author?: string; isbn?: string; coverUrl?: string }
-    try { pending = JSON.parse(raw) } catch { pending = { id: raw } }
-    let cancelled = false
-    ;(async () => {
-      try {
-        setCatalogueSaveNotice({ kind: 'info', message: 'Checking the catalogue and saving your book…' })
-        if (cancelled) return
-        let payload: ReturnType<typeof buildCatalogueShelfBookDoc> | ReturnType<typeof buildMilkyRecommendationShelfBookDoc>
-        let savedTitle = ''
-        if (pending.id) {
-          const book = await getSharedCatalogueBook(pending.id)
-          payload = buildCatalogueShelfBookDoc(user.uid, book, 'To Read')
-          savedTitle = book.title
-        } else if (pending.title && pending.author) {
-          // Prefer the canonical shared-catalogue record when one exists. Milky
-          // also carries books outside StoryPal's catalogue (including modern
-          // adult titles), so a miss must not block saving the supplied book
-          // identity as a Shelfmates recommendation.
-          const sharedBook = await findSharedCatalogueBook({
-            title: pending.title, author: pending.author, isbn: pending.isbn,
-          }).catch(() => null)
-          payload = sharedBook
-            ? buildCatalogueShelfBookDoc(user.uid, sharedBook, 'To Read')
-            : buildMilkyRecommendationShelfBookDoc(user.uid, {
-                title: pending.title, author: pending.author, isbn: pending.isbn, coverUrl: pending.coverUrl,
-              }, 'To Read')
-          savedTitle = pending.title
-        } else {
-          throw new Error('The book details were incomplete, so it was not saved.')
-        }
-        if (cancelled) return
-        await setDoc(doc(db, 'users', user.uid, 'bookshelf', payload.id), payload, { merge: true })
-        if (!cancelled) {
-          localStorage.removeItem('atomicShelf.pendingCatalogueSave.v1')
-          setCatalogueSaveNotice({
-            kind: 'success',
-            message: `Saved “${savedTitle}” to your To Read shelf${payload.catalogueProvider === 'milky' ? ' as a recommendation from The Big Shelf' : ''}.`,
-          })
-        }
-      } catch (error) {
-        // Keep the pending handoff if the actual Firestore write or a direct catalogue-ID lookup fails.
-        console.warn('Shelfmates catalogue save remains pending:', error)
-        if (!cancelled) {
-          const reason = error instanceof Error ? error.message : 'A temporary error prevented the save.'
-          setCatalogueSaveNotice({ kind: 'error', message: `${reason} Your book has not been saved; the request is kept for retry.` })
-        }
-      }
-    })()
-    return () => { cancelled = true }
-  }, [loading, user?.uid, role])
+    const parsed = parsePendingCatalogueSave(raw)
+    if (!parsed.ok) {
+      setCatalogueSaveNotice({ kind: 'error', message: \`\${parsed.reason} Dismiss this request to clear it.\` })
+      return
+    }
+    void savePending(parsed.value)
+  }, [loading, user?.uid, role, savePending])
+
+  const retryPendingSave = useCallback(() => {
+    const raw = localStorage.getItem('atomicShelf.pendingCatalogueSave.v1')
+    if (!raw) return
+    const parsed = parsePendingCatalogueSave(raw)
+    if (!parsed.ok) {
+      setCatalogueSaveNotice({ kind: 'error', message: parsed.reason })
+      return
+    }
+    void savePending(parsed.value)
+  }, [savePending])
+
+  const dismissPendingSave = useCallback(() => {
+    localStorage.removeItem('atomicShelf.pendingCatalogueSave.v1')
+    setAmbiguousBooks([])
+    setAmbiguousPending(null)
+    setCatalogueSaveNotice(null)
+  }, [])
+
   if (loading) return <div className="sm-container sm-empty">Loading Shelfmates…</div>
   return (
     <Suspense fallback={<PageFallback />}>
@@ -141,6 +209,37 @@ export default function App() {
             }}
           >
             {catalogueSaveNotice.message}
+            {catalogueSaveNotice.kind === 'error' && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button className="sm-btn sm-btn-primary" onClick={retryPendingSave}>Retry save</button>
+                <button className="sm-btn sm-btn-ghost" onClick={dismissPendingSave}>Dismiss</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {ambiguousBooks.length > 0 && ambiguousPending && (
+        <div className="sm-container" role="group" aria-label="Choose catalogue edition">
+          <div className="sm-card" style={{ marginBottom: 12, padding: 16 }}>
+            <h2 style={{ margin: '0 0 6px', fontSize: 18 }}>Which edition did you mean?</h2>
+            <p style={{ margin: '0 0 12px', color: 'var(--sm-text-muted)', fontSize: 13 }}>
+              More than one exact match was found. Choose the correct record; nothing has been saved yet.
+            </p>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {ambiguousBooks.map(book => (
+                <button
+                  key={book.id}
+                  className="sm-btn sm-btn-ghost"
+                  style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, padding: 12 }}
+                  onClick={() => void savePending(ambiguousPending, book)}
+                >
+                  <strong>{book.title}</strong>
+                  <span style={{ color: 'var(--sm-text-muted)', fontSize: 12 }}>{(book.authors ?? []).join(', ')}</span>
+                  <span style={{ color: 'var(--sm-text-subtle)', fontSize: 11 }}>Choose this edition</span>
+                </button>
+              ))}
+            </div>
+            <button className="sm-btn sm-btn-ghost" style={{ marginTop: 10 }} onClick={dismissPendingSave}>Cancel save</button>
           </div>
         </div>
       )}
