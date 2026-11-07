@@ -1,0 +1,39 @@
+[debug] [2026-10-21T11:54:10.519Z] ----------------------------------------------------------------------
+[debug] [2026-10-21T11:54:10.547Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Administrator\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js hosting:channel:list --project shelfmate-89898
+[debug] [2026-10-21T11:54:10.549Z] CLI Version:   15.31.0
+[debug] [2026-10-21T11:54:10.549Z] Platform:      win32
+[debug] [2026-10-21T11:54:10.549Z] Node Version:  v24.20.0
+[debug] [2026-10-21T11:54:10.550Z] Detected Agent: opencode
+[debug] [2026-10-21T11:54:10.550Z] Time:          Wed Oct 21 2026 14:54:10 GMT+0300 (East Africa Time)
+[debug] [2026-10-21T11:54:10.551Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-10-21T11:54:11.092Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-10-21T11:54:11.100Z] > authorizing via signed-in user (powerpages30@gmail.com)
+[debug] [2026-10-21T11:54:11.100Z] [iam] checking project shelfmate-89898 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-10-21T11:54:11.125Z] Checked if tokens are valid: true, expires at: 1792586389702
+[debug] [2026-10-21T11:54:11.125Z] Checked if tokens are valid: true, expires at: 1792586389702
+[debug] [2026-10-21T11:54:11.127Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/shelfmate-89898:testIamPermissions [none]
+[debug] [2026-10-21T11:54:11.127Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/shelfmate-89898:testIamPermissions  x-goog-user-project=shelfmate-89898
+[debug] [2026-10-21T11:54:11.128Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/shelfmate-89898:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-10-21T11:54:13.196Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/shelfmate-89898:testIamPermissions 200
+[debug] [2026-10-21T11:54:13.196Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/shelfmate-89898:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-10-21T11:54:13.197Z] Checked if tokens are valid: true, expires at: 1792586389702
+[debug] [2026-10-21T11:54:13.197Z] Checked if tokens are valid: true, expires at: 1792586389702
+[debug] [2026-10-21T11:54:13.198Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/shelfmate-89898 [none]
+[debug] [2026-10-21T11:54:14.760Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/shelfmate-89898 200
+[debug] [2026-10-21T11:54:14.761Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/shelfmate-89898 {"projectId":"shelfmate-89898","projectNumber":"686595151953","displayName":"ShelfMates","name":"projects/shelfmate-89898","resources":{"hostingSite":"shelfmate-89898"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_fa37315d-6a3e-40fa-a23b-ee0350702b11"}
+[debug] [2026-10-21T11:54:14.762Z] Checked if tokens are valid: true, expires at: 1792586389702
+[debug] [2026-10-21T11:54:14.762Z] Checked if tokens are valid: true, expires at: 1792586389702
+[debug] [2026-10-21T11:54:14.764Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/shelfmate-89898/sites/shelfmate-89898/channels pageToken=&pageSize=10
+[debug] [2026-10-21T11:54:19.225Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/shelfmate-89898/sites/shelfmate-89898/channels 200
+[debug] [2026-10-21T11:54:19.225Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/shelfmate-89898/sites/shelfmate-89898/channels {"channels":[{"name":"projects/shelfmate-89898/sites/shelfmate-89898/channels/live","url":"https://shelfmate-89898.web.app","release":{"name":"projects/shelfmate-89898/sites/shelfmate-89898/channels/live/releases/1792564563181000","version":{"name":"projects/shelfmate-89898/sites/shelfmate-89898/versions/0b29e64b1636461c","status":"FINALIZED","config":{"headers":[{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/assets/**"},{"headers":{"Cache-Control":"no-cache, no-store, must-revalidate"},"glob":"/"},{"headers":{"Cache-Control":"no-cache, no-store, must-revalidate"},"glob":"/index.html"},{"headers":{"Cache-Control":"no-cache, no-store, must-revalidate"},"glob":"**/*.html"},{"headers":{"Cache-Control":"no-cache, no-store, must-revalidate"},"glob":"/sw.js"},{"headers":{"Cache-Control":"no-cache, no-store, must-revalidate"},"glob":"/registerSW.js"},{"headers":{"Content-Type":"application/manifest+json","Cache-Control":"no-cache"},"glob":"/manifest.webmanifest"},{"headers":{"Cache-Control":"public, max-age=86400"},"glob":"**/*.@(png|jpg|jpeg|gif|svg|webp|ico|woff2)"}],"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-10-21T06:35:52.898361Z","createUser":{"email":"powerpages30@gmail.com"},"finalizeTime":"2026-10-21T06:36:01.408253Z","finalizeUser":{"email":"powerpages30@gmail.com"},"fileCount":"26","versionBytes":"807129"},"type":"DEPLOY","releaseTime":"2026-10-21T06:36:03.181Z","message":"Fix Firebase Auth reserved path in service worker","releaseUser":{"email":"powerpages30@gmail.com"}},"createTime":"2026-10-01T12:33:13.735749064Z","updateTime":"2026-10-21T06:36:03.181Z","retainedReleaseCount":2147483647},{"name":"projects/shelfmate-89898/sites/shelfmate-89898/channels/preview","url":"https://shelfmate-89898--preview-xbuotoma.web.app","release":{"name":"projects/shelfmate-89898/sites/shelfmate-89898/channels/preview/releases/1792420987344000","version":{"name":"projects/shelfmate-89898/sites/shelfmate-89898/versions/176acf255b7413ad","status":"FINALIZED","config":{"headers":[{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.@(js|css)"},{"headers":{"Cache-Control":"public, max-age=86400"},"glob":"**/*.@(png|jpg|jpeg|gif|svg|webp|ico|woff2)"},{"headers":{"Cache-Control":"no-cache, no-store, must-revalidate"},"glob":"/index.html"},{"headers":{"Cache-Control":"no-cache, no-store, must-revalidate"},"glob":"/sw.js"},{"headers":{"Content-Type":"application/manifest+json"},"glob":"/manifest.webmanifest"}],"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-10-19T14:42:24.104741Z","createUser":{"email":"powerpages30@gmail.com"},"finalizeTime":"2026-10-19T14:43:06.313294Z","finalizeUser":{"email":"powerpages30@gmail.com"},"fileCount":"26","versionBytes":"806427"},"type":"DEPLOY","releaseTime":"2026-10-19T14:43:07.344Z","releaseUser":{"email":"powerpages30@gmail.com"}},"createTime":"2026-10-19T14:42:18.997858045Z","updateTime":"2026-10-19T14:43:07.344Z","retainedReleaseCount":10,"expireTime":"2026-10-26T14:42:18.997858045Z"}]}
+[info] 
+[info] Channels for site shelfmate-89898
+[info] 
+[info] ┌────────────┬─────────────────────┬───────────────────────────────────────────────────┬─────────────────────┐
+│ Channel ID │ Last Release Time   │ URL                                               │ Expire Time         │
+├────────────┼─────────────────────┼───────────────────────────────────────────────────┼─────────────────────┤
+│ live       │ 2026-10-21 09:36:03 │ https://shelfmate-89898.web.app                   │ never               │
+├────────────┼─────────────────────┼───────────────────────────────────────────────────┼─────────────────────┤
+│ preview    │ 2026-10-19 17:43:07 │ https://shelfmate-89898--preview-xbuotoma.web.app │ 2026-10-26 17:42:18 │
+└────────────┴─────────────────────┴───────────────────────────────────────────────────┴─────────────────────┘
