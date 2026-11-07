@@ -134,6 +134,21 @@ describe('buildMilkyRecommendationShelfBookDoc', () => {
     expect(first.sourceIsbn).toBe('')
   })
 
+  it('keeps the verified description and genres on a metadata-only recommendation', () => {
+    const result = buildMilkyRecommendationShelfBookDoc('reader-1', {
+      title: 'A Book',
+      author: 'An Author',
+      isbn: '9780141439518',
+      description: 'A publisher-supplied blurb.',
+      genres: ['Historical Fiction'],
+    }, 'To Read')
+
+    expect(result.description).toBe('A publisher-supplied blurb.')
+    expect(result.genre).toBe('Historical Fiction')
+    expect(result.savedAsRecommendation).toBe(true)
+    expect(result.googleBooksId).toBe('')
+  })
+
   it('preserves ISBN-10 without mislabelling it as ISBN-13', () => {
     const result = buildMilkyRecommendationShelfBookDoc('reader-1', {
       title: 'A Book',
