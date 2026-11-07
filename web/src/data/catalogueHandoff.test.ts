@@ -11,12 +11,20 @@ describe('catalogue handoff validation', () => {
     const result = parsePendingCatalogueSave(JSON.stringify({
       id: '11111111-1111-1111-1111-111111111111',
       isbn: '978-0-14-143951-8',
+      description: 'A classic novel about society and relationships.',
     }))
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.value.id).toBe('11111111-1111-1111-1111-111111111111')
       expect(result.value.isbn).toBe('9780141439518')
+      expect(result.value.description).toBe('A classic novel about society and relationships.')
     }
+  })
+
+  it('trims and bounds optional descriptions without requiring them', () => {
+    const result = parsePendingCatalogueSave({ title: 'A Book', author: 'An Author', description: '  A useful blurb.  ' })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.description).toBe('A useful blurb.')
   })
 
   it('rejects malformed catalogue identifiers instead of treating them as titles', () => {

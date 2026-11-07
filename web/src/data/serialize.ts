@@ -79,6 +79,8 @@ export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
   author: string
   isbn?: string
   coverUrl?: string
+  description?: string
+  genres?: string[]
 }, category: string) {
   const normalizedIsbn = String(book.isbn ?? '').replace(/[^0-9Xx]/g, '').toUpperCase()
   const normalize = (value: string) => value
@@ -108,8 +110,8 @@ export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
     authors: book.author.trim(),
     coverUrl: safeCoverUrl,
     category,
-    description: '',
-    genre: '',
+    description: String(book.description ?? '').trim(),
+    genre: (book.genres ?? []).join(', '),
     pageCount: 0,
     rating: 0,
     isbn13: /^\d{13}$/.test(normalizedIsbn) ? normalizedIsbn : '',

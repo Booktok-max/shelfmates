@@ -74,12 +74,13 @@ export async function findSharedCatalogueBook(input: {
   author: string
   isbn?: string
 }): Promise<SharedCatalogueBook> {
-  const data = await catalogueJson(`${CATALOGUE_API}/books?q=${encodeURIComponent(input.title)}&limit=100&audience=adult`)
-  const items = Array.isArray(data.items) ? data.items as SharedCatalogueBook[] : []
   const isbn = normalizeIsbn(input.isbn)
 
+  // ISBN is the strongest edition identity. Query it directly first so a
+  // title variation cannot hide an existing shared-catalogue record.
   if (isbn) {
-    const isbnMatches = items.filter((item) =>
+    const byIsbn = await catalogueJson(`${CATALOGUE_API}/books?q=${encodeURIComponent(`isbn:${isbn}`)}&limit=100&audience=adult`)
+    const isbnMatches = (Array.isArray(byIsbn.items) ? byIsbn.items as SharedCatalogueBook[] : []).filter((item) =>
       (item.editions ?? []).some((edition) =>
         [edition.isbn10, edition.isbn13].some((value) => normalizeIsbn(value) === isbn)
       )
@@ -90,6 +91,8 @@ export async function findSharedCatalogueBook(input: {
     }
   }
 
+  const data = await catalogueJson(`${CATALOGUE_API}/books?q=${encodeURIComponent(input.title)}&limit=100&audience=adult`)
+  const items = Array.isArray(data.items) ? data.items as SharedCatalogueBook[] : []
   const title = normalize(input.title)
   const author = normalize(input.author)
   const matches = items.filter((item) =>

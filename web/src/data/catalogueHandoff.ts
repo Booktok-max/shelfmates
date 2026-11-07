@@ -4,6 +4,7 @@ export interface PendingCatalogueSave {
   author?: string
   isbn?: string
   coverUrl?: string
+  description?: string
 }
 
 export type PendingCatalogueSaveResult =
@@ -43,10 +44,11 @@ export function parsePendingCatalogueSave(raw: unknown): PendingCatalogueSaveRes
   }
 
   const input = value as Record<string, unknown>
+  const description = String(input.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 12000) || undefined
   const id = String(input.id ?? '').trim()
   if (id) {
     if (!UUID.test(id)) return { ok: false, reason: 'The catalogue book identifier is invalid.' }
-    return { ok: true, value: { id, isbn: normalizeHandoffIsbn(input.isbn), coverUrl: safeHandoffCoverUrl(input.coverUrl) } }
+    return { ok: true, value: { id, isbn: normalizeHandoffIsbn(input.isbn), coverUrl: safeHandoffCoverUrl(input.coverUrl), description } }
   }
 
   const title = String(input.title ?? '').trim()
@@ -62,6 +64,7 @@ export function parsePendingCatalogueSave(raw: unknown): PendingCatalogueSaveRes
       author,
       isbn: normalizeHandoffIsbn(input.isbn),
       coverUrl: safeHandoffCoverUrl(input.coverUrl),
+      description,
     },
   }
 }

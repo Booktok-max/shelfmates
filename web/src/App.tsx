@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import type { ReactElement } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
+import { coverUrl, findVolumeByIsbn } from './api/googleBooks'
 import Layout from './components/Layout'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
@@ -93,11 +94,27 @@ export default function App() {
             // Milky can contain a valid book that StoryPal's shared catalogue
             // does not yet know. Preserve it as a recommendation, not a fake
             // Google Books edition. Network/5xx failures never take this path.
+            // The catalogue miss is still a valid recommendation. Enrich it
+            // with a verified ISBN-matched Google Books description when one
+            // exists, but keep it metadata-only (no Google Books reader ID).
+            let metadata = null
+            if (pending.isbn) {
+              try {
+                metadata = await findVolumeByIsbn(pending.isbn, {
+                  title: pending.title,
+                  author: pending.author,
+                })
+              } catch (lookupError) {
+                console.info('Optional ISBN description lookup was unavailable:', lookupError)
+              }
+            }
             payload = buildMilkyRecommendationShelfBookDoc(uid, {
               title: pending.title,
               author: pending.author,
               isbn: pending.isbn,
-              coverUrl: pending.coverUrl,
+              coverUrl: pending.coverUrl || (metadata ? coverUrl(metadata) : undefined),
+              description: metadata?.volumeInfo?.description,
+              genres: metadata?.volumeInfo?.categories,
             }, 'To Read')
           } else {
             throw error
@@ -105,6 +122,27 @@ export default function App() {
         }
       } else {
         throw new Error('The book details were incomplete, so it was not saved.')
+      }
+
+      // Prefer the shared catalogue's editorial description. If it is empty, use
+      // a verified ISBN match as a fallback so recommendations do not arrive as
+      // bare title/author rows. The pending handoff description is the final
+      // fallback for older or temporarily missing catalogue metadata.
+      if (!String(payload.description ?? '').trim()) {
+        let fallbackDescription = pending.description ?? ''
+        if (pending.isbn) {
+          try {
+            const metadata = await findVolumeByIsbn(pending.isbn, {
+              title: pending.title ?? savedTitle,
+              author: pending.author ?? String(payload.authors ?? ''),
+            })
+            fallbackDescription = metadata?.volumeInfo?.description ?? fallbackDescription
+            if (!payload.coverUrl && metadata) payload.coverUrl = coverUrl(metadata) ?? ''
+          } catch (lookupError) {
+            console.info('Optional ISBN description lookup was unavailable:', lookupError)
+          }
+        }
+        if (fallbackDescription.trim()) payload.description = fallbackDescription.trim()
       }
 
       await setDoc(doc(db, 'users', uid, 'bookshelf', payload.id), payload, { merge: true })
@@ -142,6 +180,7 @@ export default function App() {
             author: params.get('saveBookAuthor'),
             isbn: params.get('saveBookIsbn'),
             coverUrl: params.get('saveBookCover'),
+            description: params.get('saveBookDescription'),
           }
         : null
 
