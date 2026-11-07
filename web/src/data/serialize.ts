@@ -1,5 +1,7 @@
 import type { GBVolume } from '../api/types'
 import { coverUrl, isbn13 } from '../api/format'
+import type { CatalogueBook } from '../api/catalogue'
+import { googleBooksIdFor } from '../api/catalogue'
 
 /**
  * Firestore document shapes must match the Android app exactly, otherwise the
@@ -27,6 +29,45 @@ export function buildShelfBookDoc(uid: string, volume: GBVolume, category: strin
     pageCount: v.pageCount ?? 0,
     rating: v.averageRating ?? 0,
     isbn13: isbn13(volume),
+    notes: '',
+    personalRating: 0,
+    savedAt: Date.now(),
+    lastUpdated: Date.now(),
+  }
+}
+
+/**
+ * A shelf document for a book that came from the shared catalogue.
+ *
+ * The document SHAPE is identical to `buildShelfBookDoc` on purpose. The
+ * Firestore shelf is shared with the Android app, and the two clients write
+ * the same fields; a different shape would mean one client silently
+ * dropping the other's data on the next write.
+ *
+ * The external id is the book's GOOGLE BOOKS id when the catalogue knows
+ * one, and the catalogue's own id otherwise. That matters: the Android app
+ * resolves a saved book through `googleBooksId`, so a book that also exists
+ * on Google Books keeps resolving there exactly as it did before, and only
+ * a book that exists nowhere on Google Books carries a catalogue id.
+ */
+export function buildCatalogueShelfBookDoc(uid: string, book: CatalogueBook, category: string) {
+  const externalId = googleBooksIdFor(book) ?? book.id
+  const editionIsbn = book.editions.find((e) => e.isbn13)?.isbn13
+    ?? book.editions.find((e) => e.isbn10)?.isbn10
+    ?? ''
+  return {
+    id: `saved_${uid}_${externalId}`,
+    userId: uid,
+    googleBooksId: externalId,
+    title: book.title ?? '',
+    authors: (book.authors ?? []).join(', '),
+    coverUrl: book.coverUrl ?? '',
+    category,
+    description: book.description ?? '',
+    genre: (book.genres?.length ? book.genres : book.subjects ?? []).join(', '),
+    pageCount: book.pageCount ?? 0,
+    rating: 0,
+    isbn13: editionIsbn,
     notes: '',
     personalRating: 0,
     savedAt: Date.now(),

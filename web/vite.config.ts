@@ -30,7 +30,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/],
+        // Firebase Auth reserves the /__/ namespace (e.g. /__/auth/handler).
+        // If the SPA fallback catches it, the service worker returns index.html
+        // and Google sign-in popups fail with a client-side 404.
+        navigateFallbackDenylist: [/^\/api/, /^\/__/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/www\.googleapis\.com\/books\/v1\//,
@@ -39,6 +42,15 @@ export default defineConfig({
             // the `X-Goog-Api-Key` header, never in the URL, so no credential
             // can end up in the cache key or the Cache Storage payload.
             options: { cacheName: 'google-books', expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 } },
+          },
+          {
+            // The shared book catalogue is a public read API with no
+            // credential in the request, so its responses are safe to cache.
+            // NetworkFirst keeps the catalogue fresh while still letting the
+            // app open offline with the last results it saw.
+            urlPattern: /\/api\/catalogue\//,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'catalogue', expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 } },
           },
         ],
       },
