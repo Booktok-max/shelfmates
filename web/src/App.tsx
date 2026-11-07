@@ -124,6 +124,27 @@ export default function App() {
         throw new Error('The book details were incomplete, so it was not saved.')
       }
 
+      // Prefer the shared catalogue's editorial description. If it is empty, use
+      // a verified ISBN match as a fallback so recommendations do not arrive as
+      // bare title/author rows. The pending handoff description is the final
+      // fallback for older or temporarily missing catalogue metadata.
+      if (!String(payload.description ?? '').trim()) {
+        let fallbackDescription = pending.description ?? ''
+        if (pending.isbn) {
+          try {
+            const metadata = await findVolumeByIsbn(pending.isbn, {
+              title: pending.title ?? savedTitle,
+              author: pending.author ?? String(payload.authors ?? ''),
+            })
+            fallbackDescription = metadata?.volumeInfo?.description ?? fallbackDescription
+            if (!payload.coverUrl && metadata) payload.coverUrl = coverUrl(metadata) ?? ''
+          } catch (lookupError) {
+            console.info('Optional ISBN description lookup was unavailable:', lookupError)
+          }
+        }
+        if (fallbackDescription.trim()) payload.description = fallbackDescription.trim()
+      }
+
       await setDoc(doc(db, 'users', uid, 'bookshelf', payload.id), payload, { merge: true })
       localStorage.removeItem('atomicShelf.pendingCatalogueSave.v1')
       setAmbiguousBooks([])
@@ -159,6 +180,7 @@ export default function App() {
             author: params.get('saveBookAuthor'),
             isbn: params.get('saveBookIsbn'),
             coverUrl: params.get('saveBookCover'),
+            description: params.get('saveBookDescription'),
           }
         : null
 
