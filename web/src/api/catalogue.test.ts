@@ -23,7 +23,7 @@ describe('shared catalogue matching', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ items: [book('isbn-match', 'Pride and Prejudice', ['Jane Austen'], [{ isbn13: '9780141439518' }]).description = 'A proper catalogue blurb'] }),
+        json: async () => ({ items: [{ ...book('isbn-match', 'Pride and Prejudice', ['Jane Austen'], [{ isbn13: '9780141439518' }]), description: 'A proper catalogue blurb' }] }),
       })
     vi.stubGlobal('fetch', fetchMock)
     const result = await findSharedCatalogueBook({
