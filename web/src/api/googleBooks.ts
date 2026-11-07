@@ -141,3 +141,37 @@ export async function getVolume(id: string): Promise<GBVolume> {
 
 export { coverUrl, authorsStr, isbn13 } from './format'
 export type { GBSearchResult, GBVolume } from './types'
+
+
+/**
+ * Resolve descriptive metadata by a known ISBN without treating the result as
+ * a readable edition. A Google Books volume is accepted only when its own
+ * industry identifiers contain the exact normalized ISBN.
+ */
+export async function findVolumeByIsbn(
+  isbn: string,
+  expected: { title?: string; author?: string } = {},
+): Promise<GBVolume | null> {
+  const normalized = String(isbn ?? '').replace(/[^0-9Xx]/g, '').toUpperCase()
+  if (!/^(?:\\d{10}|\\d{13})$/.test(normalized) && !/^\\d{9}X$/.test(normalized)) return null
+
+  const result = await searchVolumes(`isbn:${normalized}`, 0, 10)
+  const matches = (result.items ?? []).filter((volume) =>
+    (volume.volumeInfo.industryIdentifiers ?? []).some((identifier) =>
+      String(identifier.identifier ?? '').replace(/[^0-9Xx]/g, '').toUpperCase() === normalized
+    )
+  )
+  if (!matches.length) return null
+  if (matches.length === 1) return matches[0]
+
+  const normalize = (value: string) => value.normalize('NFKC').toLocaleLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim()
+  const title = expected.title ? normalize(expected.title) : ''
+  const author = expected.author ? normalize(expected.author) : ''
+  const exact = matches.filter((volume) => {
+    const info = volume.volumeInfo
+    const titleMatches = !title || normalize(info.title ?? '') === title
+    const authorMatches = !author || (info.authors ?? []).some((name) => normalize(name) === author)
+    return titleMatches && authorMatches
+  })
+  return exact.length === 1 ? exact[0] : null
+}
