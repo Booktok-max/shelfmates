@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import type { ReactElement } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
-import { findVolumeByIsbn } from './api/googleBooks'
+import { coverUrl, findVolumeByIsbn } from './api/googleBooks'
 import Layout from './components/Layout'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
