@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import type { ReactElement } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
+import { findVolumeByIsbn } from './api/googleBooks'
 import Layout from './components/Layout'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
@@ -93,11 +94,27 @@ export default function App() {
             // Milky can contain a valid book that StoryPal's shared catalogue
             // does not yet know. Preserve it as a recommendation, not a fake
             // Google Books edition. Network/5xx failures never take this path.
+            // The catalogue miss is still a valid recommendation. Enrich it
+            // with a verified ISBN-matched Google Books description when one
+            // exists, but keep it metadata-only (no Google Books reader ID).
+            let metadata = null
+            if (pending.isbn) {
+              try {
+                metadata = await findVolumeByIsbn(pending.isbn, {
+                  title: pending.title,
+                  author: pending.author,
+                })
+              } catch (lookupError) {
+                console.info('Optional ISBN description lookup was unavailable:', lookupError)
+              }
+            }
             payload = buildMilkyRecommendationShelfBookDoc(uid, {
               title: pending.title,
               author: pending.author,
               isbn: pending.isbn,
-              coverUrl: pending.coverUrl,
+              coverUrl: pending.coverUrl || (metadata ? coverUrl(metadata) : undefined),
+              description: metadata?.volumeInfo?.description,
+              genres: metadata?.volumeInfo?.categories,
             }, 'To Read')
           } else {
             throw error
