@@ -153,7 +153,7 @@ export async function findVolumeByIsbn(
   expected: { title?: string; author?: string } = {},
 ): Promise<GBVolume | null> {
   const normalized = String(isbn ?? '').replace(/[^0-9Xx]/g, '').toUpperCase()
-  if (!/^(?:\\d{10}|\\d{13})$/.test(normalized) && !/^\\d{9}X$/.test(normalized)) return null
+  if (!/^(?:\d{10}|\d{13})$/.test(normalized) && !/^\d{9}X$/.test(normalized)) return null
 
   const result = await searchVolumes(`isbn:${normalized}`, 0, 10)
   const matches = (result.items ?? []).filter((volume) =>
@@ -164,7 +164,7 @@ export async function findVolumeByIsbn(
   if (!matches.length) return null
   if (matches.length === 1) return matches[0]
 
-  const normalize = (value: string) => value.normalize('NFKC').toLocaleLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim()
+  const normalize = (value: string) => value.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
   const title = expected.title ? normalize(expected.title) : ''
   const author = expected.author ? normalize(expected.author) : ''
   const exact = matches.filter((volume) => {
