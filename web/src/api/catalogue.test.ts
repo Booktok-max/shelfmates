@@ -19,6 +19,23 @@ describe('shared catalogue matching', () => {
     expect(result.id).toBe('one')
   })
 
+  it('queries by ISBN first and returns the matching catalogue description', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items: [book('isbn-match', 'Pride and Prejudice', ['Jane Austen'], [{ isbn13: '9780141439518' }]).description = 'A proper catalogue blurb'] }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await findSharedCatalogueBook({
+      title: 'Pride and Prejudice',
+      author: 'Jane Austen',
+      isbn: '978-0-14-143951-8',
+    })
+    expect(result.id).toBe('isbn-match')
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('q')).toBe('isbn:9780141439518')
+    vi.unstubAllGlobals()
+  })
+
   it('returns an explicit ambiguous result instead of silently choosing an edition', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
