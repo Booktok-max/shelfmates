@@ -10,6 +10,9 @@ export interface ShelfBook {
   catalogueProvider?: string
   savedAsRecommendation?: boolean
   sourceIsbn?: string
+  language?: string
+  catalogueLinks?: Array<{ label: string; kind: string; provider: string; url: string }>
+  catalogueEditions?: Array<{ isbn10?: string | null; isbn13?: string | null; publisher?: string | null; publicationDate?: string | null; format?: string | null }>
   title: string
   authors: string
   coverUrl: string

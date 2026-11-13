@@ -279,3 +279,58 @@ describe('getVolume', () => {
     expect(headersOf(call)['X-Goog-Api-Key']).toBe(KEY)
   })
 })
+
+
+describe('findVolumeByIsbn', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.doUnmock('../firebase')
+  })
+
+  it('returns a volume only when its own identifiers contain the exact ISBN', async () => {
+    const { findVolumeByIsbn } = await loadModule('')
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      totalItems: 1,
+      items: [{
+        id: 'isbn-volume',
+        volumeInfo: {
+          title: 'Pride and Prejudice',
+          authors: ['Jane Austen'],
+          description: 'A useful publisher description.',
+          industryIdentifiers: [{ type: 'ISBN_13', identifier: '9780141439518' }],
+        },
+      }],
+    }))
+    const result = await findVolumeByIsbn('978-0-14-143951-8', {
+      title: 'Pride and Prejudice',
+      author: 'Jane Austen',
+    })
+    expect(result?.id).toBe('isbn-volume')
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('q')).toBe('isbn:9780141439518')
+  })
+
+  it('does not accept a provider result whose identifier does not match', async () => {
+    const { findVolumeByIsbn } = await loadModule('')
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      totalItems: 1,
+      items: [{
+        id: 'wrong-volume',
+        volumeInfo: { industryIdentifiers: [{ type: 'ISBN_13', identifier: '9780000000000' }] },
+      }],
+    }))
+    await expect(findVolumeByIsbn('9780141439518')).resolves.toBeNull()
+  })
+
+  it('returns null for malformed ISBN input without making a network request', async () => {
+    const { findVolumeByIsbn } = await loadModule('')
+    await expect(findVolumeByIsbn('not-an-isbn')).resolves.toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})

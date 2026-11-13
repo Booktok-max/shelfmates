@@ -1,5 +1,6 @@
 import type { GBVolume } from '../api/types'
 import { coverUrl, isbn13 } from '../api/format'
+import { catalogueLinks } from '../api/catalogue'
 
 /**
  * Firestore document shapes must match the Android app exactly, otherwise the
@@ -41,6 +42,9 @@ export function buildShelfBookDoc(uid: string, volume: GBVolume, category: strin
 export function buildCatalogueShelfBookDoc(uid: string, book: {
   id: string; title: string; authors?: string[]; coverUrl?: string | null;
   description?: string | null; genres?: string[]; language?: string | null;
+  readingOptions?: Array<{ provider: string; kind: string; format?: string | null; url?: string | null; attribution?: string | null; territory?: string | null }>;
+  sources?: Array<{ provider: string; sourceUrl?: string | null }>;
+  editions?: Array<{ isbn10?: string | null; isbn13?: string | null; publisher?: string | null; publicationDate?: string | null; format?: string | null }>;
 }, category: string) {
   const now = Date.now()
   return {
@@ -57,6 +61,8 @@ export function buildCatalogueShelfBookDoc(uid: string, book: {
     description: book.description ?? '',
     genre: (book.genres ?? []).join(', '),
     language: book.language ?? '',
+    catalogueLinks: catalogueLinks(book),
+    catalogueEditions: book.editions ?? [],
     pageCount: 0,
     rating: 0,
     isbn13: '',
@@ -79,6 +85,11 @@ export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
   author: string
   isbn?: string
   coverUrl?: string
+  description?: string
+  genres?: string[]
+  readingOptions?: Array<{ provider: string; kind: string; format?: string | null; url?: string | null; attribution?: string | null; territory?: string | null }>
+  sources?: Array<{ provider: string; sourceUrl?: string | null }>
+  editions?: Array<{ isbn10?: string | null; isbn13?: string | null; publisher?: string | null; publicationDate?: string | null; format?: string | null }>
 }, category: string) {
   const normalizedIsbn = String(book.isbn ?? '').replace(/[^0-9Xx]/g, '').toUpperCase()
   const normalize = (value: string) => value
@@ -108,8 +119,10 @@ export function buildMilkyRecommendationShelfBookDoc(uid: string, book: {
     authors: book.author.trim(),
     coverUrl: safeCoverUrl,
     category,
-    description: '',
-    genre: '',
+    description: String(book.description ?? '').trim(),
+    genre: (book.genres ?? []).join(', '),
+    catalogueLinks: catalogueLinks(book as Parameters<typeof catalogueLinks>[0]),
+    catalogueEditions: book.editions ?? [],
     pageCount: 0,
     rating: 0,
     isbn13: /^\d{13}$/.test(normalizedIsbn) ? normalizedIsbn : '',

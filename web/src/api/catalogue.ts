@@ -7,7 +7,43 @@ export interface SharedCatalogueBook {
   genres: string[]
   language: string | null
   availability: string
-  editions?: Array<{ isbn10?: string | null; isbn13?: string | null }>
+  editions?: Array<{ isbn10?: string | null; isbn13?: string | null; publisher?: string | null; publicationDate?: string | null; format?: string | null }>
+  readingOptions?: Array<{ provider: string; kind: string; format?: string | null; url?: string | null; attribution?: string | null; territory?: string | null }>
+  sources?: Array<{ provider: string; sourceUrl?: string | null; attributionText?: string | null }>
+}
+
+export interface CatalogueLink {
+  label: string
+  kind: string
+  provider: string
+  url: string
+}
+
+function safeCatalogueUrl(value: unknown): string | null {
+  try {
+    const url = new URL(String(value ?? '').trim())
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : null
+  } catch { return null }
+}
+
+/** Keep every validated reading/purchase/source destination from the shared catalogue. */
+export function catalogueLinks(book: Pick<SharedCatalogueBook, 'readingOptions' | 'sources'>): CatalogueLink[] {
+  const links = new Map<string, CatalogueLink>()
+  for (const option of book.readingOptions ?? []) {
+    const url = safeCatalogueUrl(option.url)
+    if (!url) continue
+    const provider = String(option.provider || 'Catalogue').replace(/[-_]/g, ' ')
+    const kind = String(option.kind || 'information')
+    const label = option.attribution?.trim() || ({ purchase: 'Buy this book', borrow: 'Borrow this book', preview: 'Read a preview', full_text_external: 'Read online', full_text_stored: 'Read online' } as Record<string, string>)[kind] || provider
+    links.set(url, { label, kind, provider, url })
+  }
+  for (const source of book.sources ?? []) {
+    const url = safeCatalogueUrl(source.sourceUrl)
+    if (!url || links.has(url)) continue
+    const provider = String(source.provider || 'Catalogue').replace(/[-_]/g, ' ')
+    links.set(url, { label: `View on ${provider}`, kind: 'source', provider, url })
+  }
+  return [...links.values()]
 }
 
 export type CatalogueLookupFailure = 'not-found' | 'ambiguous' | 'retryable' | 'invalid'
@@ -74,12 +110,13 @@ export async function findSharedCatalogueBook(input: {
   author: string
   isbn?: string
 }): Promise<SharedCatalogueBook> {
-  const data = await catalogueJson(`${CATALOGUE_API}/books?q=${encodeURIComponent(input.title)}&limit=100&audience=adult`)
-  const items = Array.isArray(data.items) ? data.items as SharedCatalogueBook[] : []
   const isbn = normalizeIsbn(input.isbn)
 
+  // ISBN is the strongest edition identity. Query it directly first so a
+  // title variation cannot hide an existing shared-catalogue record.
   if (isbn) {
-    const isbnMatches = items.filter((item) =>
+    const byIsbn = await catalogueJson(`${CATALOGUE_API}/books?q=${encodeURIComponent(`isbn:${isbn}`)}&limit=100&audience=adult`)
+    const isbnMatches = (Array.isArray(byIsbn.items) ? byIsbn.items as SharedCatalogueBook[] : []).filter((item) =>
       (item.editions ?? []).some((edition) =>
         [edition.isbn10, edition.isbn13].some((value) => normalizeIsbn(value) === isbn)
       )
@@ -90,6 +127,8 @@ export async function findSharedCatalogueBook(input: {
     }
   }
 
+  const data = await catalogueJson(`${CATALOGUE_API}/books?q=${encodeURIComponent(input.title)}&limit=100&audience=adult`)
+  const items = Array.isArray(data.items) ? data.items as SharedCatalogueBook[] : []
   const title = normalize(input.title)
   const author = normalize(input.author)
   const matches = items.filter((item) =>
