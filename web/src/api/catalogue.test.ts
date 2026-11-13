@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { findSharedCatalogueBook } from './catalogue'
+import { catalogueLinks, findSharedCatalogueBook } from './catalogue'
 
 const book = (id: string, title: string, authors: string[], editions: Array<{ isbn10?: string; isbn13?: string }> = []) => ({
   id, title, authors, editions, coverUrl: null, description: null, genres: [], language: 'en', availability: 'metadata_only',
@@ -74,5 +74,31 @@ describe('shared catalogue matching', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
     await expect(findSharedCatalogueBook({ title: 'A Book', author: 'An Author' }))
       .rejects.toMatchObject({ kind: 'retryable' })
+  })
+})
+
+
+describe('shared catalogue link inheritance', () => {
+  it('keeps all safe reading, purchase and source links while removing duplicates and unsafe URLs', () => {
+    const links = catalogueLinks({
+      readingOptions: [
+        { provider: 'retailer', kind: 'purchase', url: 'https://books.example/buy', attribution: 'Buy from retailer' },
+        { provider: 'openlibrary', kind: 'borrow', url: 'https://openlibrary.org/works/OL1W' },
+        { provider: 'bad-source', kind: 'purchase', url: 'javascript:alert(1)' },
+      ],
+      sources: [
+        { provider: 'openlibrary', sourceUrl: 'https://openlibrary.org/works/OL1W' },
+        { provider: 'google-books', sourceUrl: 'https://books.google.com/books?id=abc' },
+        { provider: 'bad-source', sourceUrl: 'http://insecure.example/book' },
+      ],
+    })
+    expect(links).toHaveLength(3)
+    expect(links.map(link => link.url)).toEqual([
+      'https://books.example/buy',
+      'https://openlibrary.org/works/OL1W',
+      'https://books.google.com/books?id=abc',
+    ])
+    expect(links[0].label).toBe('Buy from retailer')
+    expect(links[1].kind).toBe('borrow')
   })
 })
