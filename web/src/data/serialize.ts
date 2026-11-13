@@ -61,7 +61,7 @@ export function buildCatalogueShelfBookDoc(uid: string, book: {
     description: book.description ?? '',
     genre: (book.genres ?? []).join(', '),
     language: book.language ?? '',
-    catalogueLinks: catalogueLinks(book as Parameters<typeof catalogueLinks>[0]),
+    catalogueLinks: catalogueLinks(book),
     catalogueEditions: book.editions ?? [],
     pageCount: 0,
     rating: 0,
