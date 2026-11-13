@@ -27,7 +27,7 @@ function safeCatalogueUrl(value: unknown): string | null {
 }
 
 /** Keep every validated reading/purchase/source destination from the shared catalogue. */
-export function catalogueLinks(book: SharedCatalogueBook): CatalogueLink[] {
+export function catalogueLinks(book: Pick<SharedCatalogueBook, 'readingOptions' | 'sources'>): CatalogueLink[] {
   const links = new Map<string, CatalogueLink>()
   for (const option of book.readingOptions ?? []) {
     const url = safeCatalogueUrl(option.url)
