@@ -7,6 +7,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { buildShelfBookDoc } from '../data/serialize'
 import type { ShelfBook } from '../data/shelves'
+import { findSharedCatalogueBook, getSharedCatalogueBook, catalogueLinks } from '../api/catalogue'
 
 export default function BookDetail() {
   const { id } = useParams()
@@ -38,7 +39,42 @@ export default function BookDetail() {
           if (!snapshot.exists()) throw new Error('This saved book could not be found on your shelf.')
           const book = { ...(snapshot.data() as ShelfBook), id: snapshot.id }
           if (book.savedAsRecommendation || !book.googleBooksId) {
-            if (active) setSavedBook(book)
+            let enriched = book
+            try {
+              const catalogueId = String(book.catalogueBookId ?? '')
+              const shared = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(catalogueId)
+                ? await getSharedCatalogueBook(catalogueId)
+                : await findSharedCatalogueBook({
+                    title: book.title,
+                    author: String(book.authors ?? '').split(',')[0].trim(),
+                    isbn: book.sourceIsbn || book.isbn13,
+                  })
+              const inheritedLinks = catalogueLinks(shared)
+              const existingLinks = Array.isArray(book.catalogueLinks) ? book.catalogueLinks : []
+              const mergedLinks = [...existingLinks]
+              const seenUrls = new Set(existingLinks.map(link => link.url))
+              for (const link of inheritedLinks) if (!seenUrls.has(link.url)) mergedLinks.push(link)
+              enriched = {
+                ...book,
+                description: String(book.description ?? '').trim() || shared.description || '',
+                coverUrl: book.coverUrl || shared.coverUrl || '',
+                genre: book.genre || (shared.genres ?? []).join(', '),
+                language: book.language || shared.language || '',
+                catalogueLinks: mergedLinks,
+                catalogueEditions: book.catalogueEditions?.length ? book.catalogueEditions : shared.editions ?? [],
+              }
+              const changed = enriched.description !== book.description || enriched.coverUrl !== book.coverUrl ||
+                enriched.genre !== book.genre || enriched.language !== book.language ||
+                mergedLinks.length !== existingLinks.length || enriched.catalogueEditions?.length !== book.catalogueEditions?.length
+              if (changed) {
+                await setDoc(doc(db, 'users', user!.uid, 'bookshelf', snapshot.id), { ...enriched, lastUpdated: Date.now() }, { merge: true })
+              }
+            } catch (catalogueError) {
+              // Keep the saved recommendation available if the shared catalogue is offline,
+              // or if an exact title/author match cannot be established safely.
+              console.info('Optional catalogue enrichment was unavailable:', catalogueError)
+            }
+            if (active) setSavedBook(enriched)
             return
           }
           const result = await getVolume(book.googleBooksId)
@@ -92,6 +128,28 @@ export default function BookDetail() {
               <p style={{ color: 'var(--sm-text-muted)', fontSize: 13 }}>ISBN: {savedBook.isbn13 || savedBook.sourceIsbn}</p>
             )}
             {savedBook.description && <p style={{ fontSize: 14, lineHeight: 1.6 }}>{savedBook.description}</p>}
+            {savedBook.catalogueEditions?.length ? (
+              <div style={{ marginTop: 12, fontSize: 13, color: 'var(--sm-text-muted)' }}>
+                <strong>Edition details</strong>
+                {savedBook.catalogueEditions.map((edition, index) => (
+                  <div key={index} style={{ marginTop: 4 }}>
+                    {[edition.publisher, edition.publicationDate, edition.format, edition.isbn13 || edition.isbn10 ? `ISBN ${edition.isbn13 || edition.isbn10}` : ''].filter(Boolean).join(' · ')}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {savedBook.catalogueLinks?.length ? (
+              <div style={{ marginTop: 18 }}>
+                <h2 style={{ fontSize: 16, margin: '0 0 8px' }}>Explore this book</h2>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {savedBook.catalogueLinks.map(link => (
+                    <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="sm-btn sm-btn-ghost">
+                      {link.label} ↗
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {savedBook.savedAsRecommendation && (
               <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--sm-text-muted)', marginTop: 16 }}>
                 This is a saved book recommendation. A digital reading edition is not attached to this record.
